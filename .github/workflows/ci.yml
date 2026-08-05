@@ -1,5 +1,10 @@
 name: CI
 
+# Android-only. This fork does not maintain the inherited iOS app, so the upstream
+# ios-compile job (which burned a macOS runner on every push) and the iOS/Android
+# version-consistency check have both been removed — the latter would fail the first
+# time the Android version is bumped on its own, which is exactly what we intend to do.
+
 on:
   push:
     branches: [main]
@@ -14,44 +19,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  version-consistency:
-    name: Version consistency
+  hygiene:
+    name: Repo hygiene
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-
-      - name: Check iOS and Android versions match
-        run: |
-          python3 - <<'PY'
-          import pathlib
-          import plistlib
-          import re
-          import sys
-
-          root = pathlib.Path.cwd()
-          gradle = (root / "HomelabAndroid/app/build.gradle.kts").read_text()
-          plist_path = root / "HomelabSwift/Homelab/Info.plist"
-
-          version_name = re.search(r'versionName\s*=\s*"([^"]+)"', gradle)
-          version_code = re.search(r'versionCode\s*=\s*(\d+)', gradle)
-          if not version_name or not version_code:
-              print("Could not read Android versionName/versionCode", file=sys.stderr)
-              sys.exit(1)
-
-          with plist_path.open("rb") as fp:
-              info = plistlib.load(fp)
-
-          ios_version = str(info.get("CFBundleShortVersionString", ""))
-          ios_build = str(info.get("CFBundleVersion", ""))
-          android_version = version_name.group(1)
-          android_build = version_code.group(1)
-
-          if ios_version != android_version or ios_build != android_build:
-              print(f"Version mismatch: iOS {ios_version} ({ios_build}) vs Android {android_version} ({android_build})", file=sys.stderr)
-              sys.exit(1)
-
-          print(f"Versions match: {ios_version} ({ios_build})")
-          PY
 
       - name: Ensure release binaries are not tracked
         run: |
@@ -62,10 +34,20 @@ jobs:
             exit 1
           fi
 
-  android-compile:
-    name: Android compile
+      - name: Ensure the update check has not been hardcoded again
+        run: |
+          # The in-app updater must stay driven by buildConfigField and default to empty,
+          # so that forks of this repo do not phone home to us the way we did to upstream.
+          if grep -rnE 'https://(raw\.githubusercontent\.com|github\.com)/[^"]*/(app-version\.json|releases)' \
+               HomelabAndroid/app/src/main --include='*.kt'; then
+            echo "Update URLs must come from BuildConfig, not string literals."
+            exit 1
+          fi
+
+  android:
+    name: Android compile and test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: HomelabAndroid
@@ -79,37 +61,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6.1.0
 
-      - name: Compile Debug Kotlin
+      - name: Compile debug sources
         run: ./gradlew :app:compileDebugKotlin --console=plain
 
-  ios-compile:
-    name: iOS compile
-    runs-on: macos-26
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: HomelabSwift
-    steps:
-      - uses: actions/checkout@v5
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --console=plain
 
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      - name: Create CI signing config
-        run: |
-          mkdir -p Config
-          cat > Config/Signing.xcconfig <<'EOF'
-          DEVELOPMENT_TEAM =
-          PRODUCT_BUNDLE_IDENTIFIER = homelab.foreverhomelab
-          EOF
-
-      - name: Compile iOS app without signing
-        run: |
-          xcodebuild build \
-            -project Homelab.xcodeproj \
-            -scheme Homelab \
-            -configuration Debug \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/homelab-ios-dd" \
-            CODE_SIGNING_ALLOWED=NO
+      # Instrumented tests need a device, so CI only proves they still compile.
+      # Run them locally with: ./gradlew connectedDebugAndroidTest
+      - name: Compile instrumented tests
+        run: ./gradlew :app:assembleDebugAndroidTest --console=plain

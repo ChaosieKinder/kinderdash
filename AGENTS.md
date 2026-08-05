@@ -1,118 +1,98 @@
-# AGENTS.md - Homelab
+# AGENTS.md — KinderDash
 
-This repository is the single working copy for Homelab development.
+Instructions for AI agents working in this repository.
 
-## Repository Flow
+This is a **personal fork** of the archived [JohnnWi/homelab-project](https://github.com/JohnnWi/homelab-project),
+kept for one purpose: adding a **full-page Android home-screen widget**. Read `README.md` first.
 
-- Work from this repository root only.
-- `origin` is the primary GitHub remote.
-- `gitea` is an optional mirror remote only.
-- Do not use the old Gitea working copy for new work.
-- Keep `main` tracking `origin/main`.
+Upstream's AGENTS.md described a two-platform release process on macOS. None of it applied here, so
+this file replaces it rather than amending it.
 
-## Branch Strategy
+---
 
-- Use `main` for normal owner-directed changes, release preparation, and release follow-up commits.
-- Create a short-lived branch for larger/riskier work, external PR review, or changes that should not block release work.
-- Prefer branch names like `feat/service-name`, `fix/issue-name`, `docs/topic`, or `ci/topic`.
-- Use a separate git worktree only when another uncommitted task is already in progress and switching branches would risk mixing changes.
-- Do not merge or close external PRs without reviewing the diff and running the relevant checks.
+## What this fork is, and is not
 
-## Development Rules
+- **Android only.** `HomelabSwift/` is inherited and unmaintained — do not modify it, do not build
+  it, do not fix it. If a change would touch iOS, stop and say so instead.
+- **Nothing is released.** No signed artefacts, no GitHub releases, no AltStore/SideStore source, no
+  store listings. Version bumps are free of cross-platform coupling.
+- **No external contributors.** No PR review flow, no issue triage.
+- **`origin` is the only remote** (`ChaosieKinder/kinderdash`). `upstream` and `unitsung` exist
+  locally as read-only references and must never be pushed to.
 
-- Make focused commits with clear messages:
-  - `feat: ...`
-  - `fix: ...`
-  - `docs: ...`
-  - `ci: ...`
-  - `chore: ...`
-- For release-bound changes, update both platform versions together:
-  - Android: `HomelabAndroid/app/build.gradle.kts`
-  - iOS: `HomelabSwift/Homelab/Info.plist`
-- Keep Android `versionCode` and iOS `CFBundleVersion` aligned.
-- Keep Android `versionName` and iOS `CFBundleShortVersionString` aligned.
-- Do not commit generated release binaries (`.ipa`, `.apk`, `.aab`) unless explicitly requested.
+## Repository layout
 
-## Verification Policy
+- `HomelabAndroid/` — the Android app. **This is the Gradle project root**, not the repo root.
+- `HomelabSwift/` — inherited iOS app. Out of scope.
+- `docs/`, `apps.json` — upstream leftovers, inert. Don't build on them.
+- `app-version.json` — a template for the opt-in update check. Safe to hand-edit; upstream's rule
+  against editing it does not apply, because the workflow that owned it has been removed.
 
-- Run local checks based on the files touched; do not run every build for every change by default.
-- Docs-only changes (`README.md`, `AGENTS.md`, license, markdown, screenshots) do not require local Android or iOS builds.
-- Android-only code/resources require the Android compile check; run Android unit tests when logic, networking, parsing, storage, or ViewModels change.
-- iOS-only code/resources require the iOS compile check; run iOS unit tests when logic, networking, parsing, storage, or model behavior changes.
-- Cross-platform service changes, shared release metadata, or version bumps require both Android and iOS compile checks.
-- Release publishing with user-provided signed `Homelab.ipa` and `Homelab.apk` does not require rebuilding locally unless source code changed in the same task.
-- After pushing to `main`, always inspect the GitHub Actions `CI` run. The task is not complete if CI fails.
+## Branch and commit strategy
 
-## Build Checks
+- **Branch for anything non-trivial**; don't commit straight to `main`. Names: `feat/…`, `fix/…`,
+  `security/…`, `docs/…`, `chore/…`.
+- Fast-forward onto `main` when the work is done and verified.
+- Conventional commit subjects (`feat:`, `fix:`, `docs:`, `chore:`, `security:`).
+- **Explain *why* in the body, not just what.** Several decisions here look like mistakes without
+  their reasoning — see *Decisions that look wrong* below.
 
-Android compile check:
+## Build and verification
+
+Windows-native builds; the tree lives on an NTFS drive and building it through WSL is ~8× slower.
 
 ```bash
 cd HomelabAndroid
-GRADLE_USER_HOME="$PWD/.gradle-home" \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-./gradlew :app:compileDebugKotlin --console=plain
+./gradlew assembleDebug              # or :app:compileDebugKotlin for a quick check
+./gradlew testDebugUnitTest          # JVM unit tests
+./gradlew connectedDebugAndroidTest  # instrumented — needs a device attached
 ```
 
-iOS compile check without launching simulators:
+Requires JDK 21. Note `gradle/gradle-daemon-jvm.properties` pins the Gradle **daemon** to a
+JetBrains-vendor JVM, so a non-JBR `JAVA_HOME` is used only for the launcher.
 
-```bash
-cd HomelabSwift
-xcodebuild build \
-  -project Homelab.xcodeproj \
-  -scheme Homelab \
-  -configuration Debug \
-  -sdk iphoneos \
-  -destination 'generic/platform=iOS' \
-  -derivedDataPath /private/tmp/homelab-ios-dd \
-  CODE_SIGNING_ALLOWED=NO
-```
+**Verification policy:** run a compile check for any Kotlin/resource change. Run unit tests when
+touching logic, networking, parsing, storage or ViewModels. Docs-only changes need no build.
+Instrumented tests only run with a device attached — if none is, say so rather than claiming they
+passed.
 
-## Test Checks
+CI (`.github/workflows/ci.yml`) is Android-only and checks: no tracked release binaries, no
+hardcoded update URLs, compile, unit tests, and that instrumented tests still compile.
 
-Android unit tests:
+## Decisions that look wrong without their reasons
 
-```bash
-cd HomelabAndroid
-GRADLE_USER_HOME="$PWD/.gradle-home" \
-JAVA_HOME=$(/usr/libexec/java_home -v 21) \
-./gradlew :app:testDebugUnitTest --console=plain
-```
+Do not "fix" these without reading why:
 
-iOS unit tests require an available iOS simulator:
+- **`setUserAuthenticationRequired(false)`** in `CredentialCipher`. An auth-bound Keystore key
+  cannot be used while the device is locked, which would break the widget's background refresh —
+  the entire point of the app.
+- **Credential encryption lives in the entity↔domain mappers**, not in the schema or a
+  TypeConverter. `ServiceInstanceDao` is injected into exactly one class, which makes those mappers
+  a real chokepoint. **If you add a credential column, wrap it there too.**
+- **`CredentialCipher.encrypt` falls back to plaintext on failure; `decrypt` returns null.** Failing
+  closed on save would discard a credential the user just typed. Failing closed on read costs only
+  a re-entry.
+- **Update-check URLs default to empty** and the check is skipped when unset. This is deliberate so
+  that forks of *this* repo don't phone home to us — which is the bug we inherited from upstream.
+  Never reintroduce a literal URL; CI fails on it.
+- **Glance stays at 1.1.1.** That is the current stable release; 1.2.0 never shipped past `rc01`.
+  `SizeMode.Responsive` — the API the widget needs — is already in 1.1.x.
 
-```bash
-cd HomelabSwift
-xcodebuild test \
-  -project Homelab.xcodeproj \
-  -scheme Homelab \
-  -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -derivedDataPath /private/tmp/homelab-ios-test
-```
+## Widget work (the actual goal)
 
-If the exact simulator is unavailable, list devices with `xcrun simctl list devices available` and adjust the destination.
+- Target surfaces are a book-style foldable (**10:16 folded, 4:3 open**) and a standard phone.
+  Both foldable states are *squarer* than a normal phone, so **lay out square-first and let the
+  tall-narrow phone grid be the degraded case** — the opposite of the usual instinct.
+- Build on `SizeMode.Responsive` from the start; retrofitting it is painful.
+- Prefer extending the existing `getSummary()` convention on repositories (see `KomodoRepository`,
+  `UptimeKumaRepository`, `PlexRepository`) over new bespoke data paths. Widget refreshes must stay
+  cheap — never call a heavyweight `getDashboard()` on a refresh cycle.
 
-## Release Flow
+## Security
 
-- Release builds are manual unless signing automation is explicitly added later.
-- The user provides the final signed `Homelab.ipa` and `Homelab.apk`.
-- Create a GitHub release with tag `vX.Y.Z` and upload both assets.
-- The `Update AltStore Source` workflow updates `apps.json` and `app-version.json`.
-- After the workflow succeeds, pull `origin/main`.
-- Push `main` to `gitea` only as a mirror if desired.
+This app stores homelab service credentials. Accordingly:
 
-## Manifest Rules
-
-- Do not manually edit `apps.json` or `app-version.json` for normal releases.
-- The release workflow extracts iOS build metadata from the uploaded IPA.
-- Always verify after a release:
-  - `app-version.json.latest`
-  - `apps.json` latest version entry
-  - IPA/APK URLs point to the new release
-  - GitHub Actions run status is `success`
-
-## Platform Notes
-
-- SideStore and AltStore Classic/World are supported through the IPA source.
-- Keep README wording specific: use "AltStore Classic / SideStore" when discussing sideloading.
+- Never log credential values, and never add them to crash/analytics payloads.
+- Never put real hostnames, IP addresses, tokens or topology into this repository — **it is public**
+  (GitHub forks cannot be made private). Test fixtures use obviously fake values.
+- Both backup rule files exclude every domain in both sections. Don't narrow them.
