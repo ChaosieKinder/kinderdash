@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Legacy backup config, used on Android 11 and below (minSdk is 26, so this
+  path is still live even though both target devices are Android 12+).
+  Android 12+ uses data_extraction_rules.xml instead.
+
+  Same reasoning as that file: credentials live in the Room DB ("database")
+  and in DataStore ("file", not "sharedpref"). Excluding sharedpref alone
+  leaves both exposed.
+-->
 <full-backup-content>
-    <exclude domain="sharedpref" path="."/>
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
 </full-backup-content>

@@ -1,9 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  KinderDash: this app stores homelab service credentials (API keys, bearer
+  tokens, passwords) in the Room DB and in DataStore. None of it may leave the
+  device.
+
+  Two things that are easy to get wrong here:
+
+  1. android:allowBackup="false" does NOT disable device-to-device transfer on
+     Android 12+. Only the <device-transfer> rules below do, and include/exclude
+     rules do not affect D2D unless declared here. Both sections must exclude
+     everything.
+
+  2. DataStore Preferences writes to files/datastore/*.preferences_pb — that is
+     the "file" domain, NOT "sharedpref". Excluding sharedpref alone misses the
+     stored connections entirely.
+
+  So: exclude every domain, in both sections, explicitly.
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="sharedpref" path="."/>
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="sharedpref" path="."/>
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </device-transfer>
 </data-extraction-rules>
