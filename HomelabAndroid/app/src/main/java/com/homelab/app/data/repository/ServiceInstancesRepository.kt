@@ -1,6 +1,7 @@
 package com.homelab.app.data.repository
 
 import com.homelab.app.data.local.SettingsManager
+import com.homelab.app.data.local.crypto.CredentialCipher
 import com.homelab.app.data.local.dao.ServiceInstanceDao
 import com.homelab.app.data.local.entity.ServiceInstanceEntity
 import com.homelab.app.domain.model.PiHoleAuthMode
@@ -18,7 +19,8 @@ import javax.inject.Singleton
 @Singleton
 class ServiceInstancesRepository @Inject constructor(
     private val dao: ServiceInstanceDao,
-    private val settingsManager: SettingsManager
+    private val settingsManager: SettingsManager,
+    private val credentialCipher: CredentialCipher
 ) {
     val allInstances: Flow<List<ServiceInstance>> = dao.observeAll().map { entities ->
         entities.map { it.toDomain() }
@@ -168,44 +170,61 @@ class ServiceInstancesRepository @Inject constructor(
         val repaired = instances.firstOrNull { it.id == currentPreferred } ?: instances.firstOrNull()
         settingsManager.setPreferredInstanceId(type, repaired?.id)
     }
-}
 
-private fun ServiceInstanceEntity.toDomain(): ServiceInstance {
-    return ServiceInstance(
-        id = id,
-        type = ServiceType.fromStoredName(type),
-        label = label,
-        url = url,
-        token = token,
-        proxmoxCsrfToken = proxmoxCsrfToken,
-        proxmoxOtp = proxmoxOtp,
-        username = username,
-        apiKey = apiKey,
-        piholePassword = piholePassword,
-        piholeAuthMode = piholeAuthMode?.let(PiHoleAuthMode::valueOf),
-        fallbackUrl = fallbackUrl,
-        allowSelfSigned = allowSelfSigned,
-        password = password
-    )
-}
+    // ---------------------------------------------------------------------------------------
+    // Entity <-> domain mapping.
+    //
+    // These two functions are the ONLY boundary between the Room database and the rest of the
+    // app, which is what makes them the right place to encrypt credentials: ServiceInstanceDao is
+    // injected into this class and nowhere else, so nothing can reach the entity without passing
+    // through here.
+    //
+    // The domain model therefore always holds plaintext, and the database always holds ciphertext.
+    // Callers (AuthInterceptor and friends) are unchanged and unaware.
+    //
+    // If a new credential column is added to ServiceInstanceEntity, it must be wrapped in
+    // credentialCipher here too. Non-secret columns (url, label, username, fallbackUrl) are left
+    // in the clear deliberately — they are not sensitive and encrypting them would make the rows
+    // unqueryable and undebuggable for no gain.
+    // ---------------------------------------------------------------------------------------
 
-private fun ServiceInstance.toEntity(): ServiceInstanceEntity {
-    return ServiceInstanceEntity(
-        id = id,
-        type = type.name,
-        label = label.ifBlank { type.displayName },
-        url = url,
-        token = token,
-        proxmoxCsrfToken = proxmoxCsrfToken,
-        proxmoxOtp = proxmoxOtp,
-        username = username,
-        apiKey = apiKey,
-        piholePassword = piholePassword,
-        piholeAuthMode = piholeAuthMode?.name,
-        fallbackUrl = fallbackUrl,
-        allowSelfSigned = allowSelfSigned,
-        password = password
-    )
+    private fun ServiceInstanceEntity.toDomain(): ServiceInstance {
+        return ServiceInstance(
+            id = id,
+            type = ServiceType.fromStoredName(type),
+            label = label,
+            url = url,
+            token = credentialCipher.decrypt(token).orEmpty(),
+            proxmoxCsrfToken = credentialCipher.decrypt(proxmoxCsrfToken),
+            proxmoxOtp = credentialCipher.decrypt(proxmoxOtp),
+            username = username,
+            apiKey = credentialCipher.decrypt(apiKey),
+            piholePassword = credentialCipher.decrypt(piholePassword),
+            piholeAuthMode = piholeAuthMode?.let(PiHoleAuthMode::valueOf),
+            fallbackUrl = fallbackUrl,
+            allowSelfSigned = allowSelfSigned,
+            password = credentialCipher.decrypt(password)
+        )
+    }
+
+    private fun ServiceInstance.toEntity(): ServiceInstanceEntity {
+        return ServiceInstanceEntity(
+            id = id,
+            type = type.name,
+            label = label.ifBlank { type.displayName },
+            url = url,
+            token = credentialCipher.encrypt(token).orEmpty(),
+            proxmoxCsrfToken = credentialCipher.encrypt(proxmoxCsrfToken),
+            proxmoxOtp = credentialCipher.encrypt(proxmoxOtp),
+            username = username,
+            apiKey = credentialCipher.encrypt(apiKey),
+            piholePassword = credentialCipher.encrypt(piholePassword),
+            piholeAuthMode = piholeAuthMode?.name,
+            fallbackUrl = fallbackUrl,
+            allowSelfSigned = allowSelfSigned,
+            password = credentialCipher.encrypt(password)
+        )
+    }
 }
 
 private fun normalizeUrl(raw: String, type: ServiceType? = null): String {
