@@ -21,6 +21,19 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Request
 
+/**
+ * The cheap slice of Plex that the home-screen widget needs, mirroring the `getSummary()`
+ * convention already used by KomodoRepository and UptimeKumaRepository.
+ */
+data class PlexSummary(
+    /** Every current session, including paused ones. */
+    val activeStreams: Int,
+    /** Sessions actually playing right now — usually the more interesting number. */
+    val playingStreams: Int,
+    /** Sessions the server is transcoding, i.e. the ones costing it CPU. */
+    val transcodingStreams: Int
+)
+
 @Singleton
 class PlexRepository @Inject constructor(
     private val api: PlexApi,
@@ -159,7 +172,25 @@ class PlexRepository @Inject constructor(
         }
     }
 
-    private suspend fun getActiveSessions(instanceId: String): List<PlexSession> {
+    /**
+     * One request, for callers that only need the stream counts.
+     *
+     * [getDashboard] also carries this information, but it fans out to five endpoints — including
+     * libraries-with-sizes, which walks every library section. That is far too heavy to run on a
+     * widget refresh cycle just to learn how many people are watching. This hits the sessions
+     * endpoint and nothing else.
+     */
+    suspend fun getSummary(instanceId: String): PlexSummary {
+        val sessions = getActiveSessions(instanceId)
+        return PlexSummary(
+            activeStreams = sessions.size,
+            playingStreams = sessions.count { it.playerState.equals("playing", ignoreCase = true) },
+            transcodingStreams = sessions.count { it.isTranscoding }
+        )
+    }
+
+    /** Public so callers can get session detail without paying for the full [getDashboard] fan-out. */
+    suspend fun getActiveSessions(instanceId: String): List<PlexSession> {
         val payload = api.getActiveSessions(instanceId = instanceId)
         val mc = payload["MediaContainer"]?.asObject() ?: return emptyList()
         val metas = (mc["Metadata"] ?: mc["Video"] ?: mc["Track"])?.asArray() ?: return emptyList()
