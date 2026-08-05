@@ -60,6 +60,7 @@ Per Apache 2.0 §4(b), the notable modifications so far:
 |---|---|
 | Credential columns encrypted with an Android Keystore AES-256-GCM key | Upstream stored API keys, tokens and passwords as plaintext Room columns |
 | Cloud-backup and device-transfer rules exclude all domains | `allowBackup="false"` does not block D2D transfer on Android 12+, and DataStore lives in the `file` domain, not `sharedpref` |
+| In-app update check moved to `BuildConfig`, empty by default and skipped when unset | It was hardcoded to upstream's repo, so every fork phoned home to its parent and offered a differently-signed APK that could never install |
 | Accepted Android Studio's `org.gradle.tooling.parallel` setting | Avoids the tree being dirtied on every sync |
 
 Planned, not yet built: a cross-service aggregation layer and the Glance widget itself.

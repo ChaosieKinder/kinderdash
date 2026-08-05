@@ -17,7 +17,31 @@ android {
         versionCode = 39
         versionName = "1.6.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
+        // In-app update check — opt-in, and empty by default ON PURPOSE.
+        //
+        // These used to be hardcoded to the upstream repository, which meant every fork silently
+        // phoned home to its parent and offered to install the parent's APK — an APK signed with a
+        // different key, so the install could only ever fail. Defaulting to empty means a fork of
+        // *this* repo inherits a disabled update check rather than one pointing at us.
+        //
+        // To enable, set these in gradle.properties (or pass -P on the command line):
+        //   kinderdash.updateManifestUrl=https://raw.githubusercontent.com/<owner>/<repo>/main/app-version.json
+        //   kinderdash.updateReleasesUrl=https://github.com/<owner>/<repo>/releases
+        //
+        // Values are embedded as Java string literals, so avoid quotes and backslashes in them.
+        buildConfigField(
+            "String",
+            "UPDATE_MANIFEST_URL",
+            "\"${providers.gradleProperty("kinderdash.updateManifestUrl").getOrElse("")}\""
+        )
+        buildConfigField(
+            "String",
+            "UPDATE_RELEASES_URL",
+            "\"${providers.gradleProperty("kinderdash.updateReleasesUrl").getOrElse("")}\""
+        )
+
+
         vectorDrawables {
             useSupportLibrary = true
         }

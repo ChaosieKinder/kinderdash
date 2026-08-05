@@ -1,6 +1,7 @@
 {
+  "_comment": "Template for the in-app update check. Inert unless a build sets kinderdash.updateManifestUrl to point at a copy of this file served from its own repo — see HomelabAndroid/app/build.gradle.kts. This fork publishes no releases, so the URLs are intentionally empty. Previously this pointed at upstream's release assets, which no fork should inherit.",
   "latest": "1.6.2",
-  "ios_url": "https://github.com/JohnnWi/homelab-project/releases/download/v1.6.2/Homelab.ipa",
-  "android_url": "https://github.com/JohnnWi/homelab-project/releases/download/v1.6.2/Homelab.apk",
-  "changelog": "Removed the crypto donation section from Settings on iOS and Android.\nCleaned up related donation strings and settings UI copy.\nIncluded minor settings maintenance for the 1.6.2 release."
+  "ios_url": "",
+  "android_url": "",
+  "changelog": ""
 }

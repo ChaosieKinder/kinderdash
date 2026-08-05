@@ -53,9 +53,22 @@ class SettingsViewModel @Inject constructor(
     private val _appIconApplying = MutableStateFlow(false)
     val appIconApplying: StateFlow<Boolean> = _appIconApplying
 
-    private val updateManifestUrl = "https://raw.githubusercontent.com/JohnnWi/homelab-project/main/app-version.json"
-    private val defaultUpdateUrl = "https://github.com/JohnnWi/homelab-project/releases"
+    // Both come from build config and are empty unless a build explicitly opts in — see the
+    // buildConfigField block in app/build.gradle.kts for why the default matters.
+    private val updateManifestUrl = BuildConfig.UPDATE_MANIFEST_URL
+    private val defaultUpdateUrl = BuildConfig.UPDATE_RELEASES_URL
     private val updateCheckIntervalMs = 15 * 60 * 1000L
+
+    /** True when this build has been given somewhere to check. */
+    private val updateCheckEnabled: Boolean get() = updateManifestUrl.isNotBlank()
+
+    /**
+     * Where "Update" should send the user: the manifest's own link if it has one, else the build's
+     * releases URL. Null when neither exists — a banner whose button opens nothing is worse than
+     * no banner.
+     */
+    private fun resolveUpdateUrl(candidate: String?): String? =
+        candidate?.takeIf { it.isNotBlank() } ?: defaultUpdateUrl.takeIf { it.isNotBlank() }
 
     val instancesByType: StateFlow<Map<ServiceType, List<ServiceInstance>>> = servicesRepository.instancesByType
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -201,6 +214,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     private suspend fun checkForUpdateBanner(force: Boolean) {
+        if (!updateCheckEnabled) {
+            // No manifest configured for this build: never fetch, never surface anything.
+            _updateBannerState.value = null
+            _updatePopupState.value = null
+            return
+        }
+
         val current = BuildConfig.VERSION_NAME
         val dismissed = localPreferencesRepository.dismissedUpdateVersion.firstOrNull()
         val dismissedPopup = localPreferencesRepository.dismissedPopupVersion.firstOrNull()
@@ -210,15 +230,19 @@ class SettingsViewModel @Inject constructor(
         val cachedChangelog = localPreferencesRepository.updateAvailableChangelog.firstOrNull()
         val now = System.currentTimeMillis()
 
+        val cachedUpdateUrl = resolveUpdateUrl(cachedUrl)
+
         val cachedState = cachedLatest
             ?.trim()
             ?.takeIf { it.isNotEmpty() && compareVersions(it, current) > 0 && dismissed != it }
-            ?.let {
-                UpdateBannerState(
-                    latestVersion = it,
-                    currentVersion = current,
-                    updateUrl = cachedUrl?.takeIf { url -> url.isNotBlank() } ?: defaultUpdateUrl
-                )
+            ?.let { version ->
+                cachedUpdateUrl?.let { url ->
+                    UpdateBannerState(
+                        latestVersion = version,
+                        currentVersion = current,
+                        updateUrl = url
+                    )
+                }
             }
 
         _updateBannerState.value = cachedState
@@ -226,12 +250,14 @@ class SettingsViewModel @Inject constructor(
         // Restore popup from cache
         cachedLatest?.trim()
             ?.takeIf { it.isNotEmpty() && compareVersions(it, current) > 0 && dismissed != it && dismissedPopup != it }
-            ?.let {
-                _updatePopupState.value = UpdatePopupState(
-                    latestVersion = it,
-                    changelog = cachedChangelog,
-                    updateUrl = cachedUrl?.takeIf { url -> url.isNotBlank() } ?: defaultUpdateUrl
-                )
+            ?.let { version ->
+                _updatePopupState.value = cachedUpdateUrl?.let { url ->
+                    UpdatePopupState(
+                        latestVersion = version,
+                        changelog = cachedChangelog,
+                        updateUrl = url
+                    )
+                }
             }
 
         if (!force && lastCheckedAt != null && (now - lastCheckedAt) < updateCheckIntervalMs) {
@@ -252,9 +278,9 @@ class SettingsViewModel @Inject constructor(
             return
         }
 
-        val updateUrl = payload.androidUrl?.takeIf { it.isNotBlank() } ?: defaultUpdateUrl
+        val updateUrl = resolveUpdateUrl(payload.androidUrl)
         val isNewer = compareVersions(latest, current) > 0
-        if (!isNewer) {
+        if (updateUrl == null || !isNewer) {
             localPreferencesRepository.setAvailableUpdate(version = null, url = null, changelog = null)
             _updateBannerState.value = null
             _updatePopupState.value = null
