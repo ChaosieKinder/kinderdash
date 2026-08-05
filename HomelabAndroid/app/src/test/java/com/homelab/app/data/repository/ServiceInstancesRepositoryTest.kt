@@ -35,7 +35,7 @@ class ServiceInstancesRepositoryTest {
                 )
             )
         )
-        val repository = ServiceInstancesRepository(dao, settingsManager(state))
+        val repository = ServiceInstancesRepository(dao, settingsManager(state), passthroughCredentialCipher())
 
         repository.migrateLegacyDataIfNeeded()
         repository.migrateLegacyDataIfNeeded()
@@ -52,7 +52,7 @@ class ServiceInstancesRepositoryTest {
     fun `two instances of same type coexist and preferred repairs after delete`() = runTest {
         val dao = FakeServiceInstanceDao()
         val state = SettingsState()
-        val repository = ServiceInstancesRepository(dao, settingsManager(state))
+        val repository = ServiceInstancesRepository(dao, settingsManager(state), passthroughCredentialCipher())
         val first = ServiceInstance(
             id = "instance-1",
             type = ServiceType.GITEA,
