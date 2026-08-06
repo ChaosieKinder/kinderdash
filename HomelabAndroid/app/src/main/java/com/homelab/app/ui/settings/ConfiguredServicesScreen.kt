@@ -392,6 +392,7 @@ fun ServiceSettingsSection(
 @Composable
 internal fun serviceDisplayNameForSettings(type: ServiceType): String {
     return when (type) {
+        ServiceType.GRAFANA -> stringResource(R.string.service_grafana)
         ServiceType.PORTAINER -> stringResource(R.string.service_portainer)
         ServiceType.PIHOLE -> stringResource(R.string.service_pihole)
         ServiceType.ADGUARD_HOME -> stringResource(R.string.service_adguard_home)

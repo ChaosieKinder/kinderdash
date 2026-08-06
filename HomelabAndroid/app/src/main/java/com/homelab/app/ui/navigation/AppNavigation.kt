@@ -111,6 +111,9 @@ private fun dashboardRoute(type: ServiceType, instanceId: String): String {
         ServiceType.BAZARR,
         ServiceType.GLUETUN,
         ServiceType.FLARESOLVERR -> "media/${type.name}/$instanceId/dashboard"
+        // No in-app Grafana screen yet — Grafana is a web dashboard and re-implementing it
+        // natively buys little. Opening it in a browser is the sensible follow-up.
+        ServiceType.GRAFANA -> Screen.Home.route
         ServiceType.UNKNOWN -> Screen.Home.route
     }
 }

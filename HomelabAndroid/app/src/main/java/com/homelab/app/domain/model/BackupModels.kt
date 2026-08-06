@@ -44,6 +44,7 @@ object BackupServiceTypeMapper {
     /** Canonical lowercase backup key for a given ServiceType. */
     fun backupKey(type: ServiceType): String {
         return when (type) {
+            ServiceType.GRAFANA -> "grafana"
             ServiceType.PORTAINER -> "portainer"
             ServiceType.PIHOLE -> "pihole"
             ServiceType.ADGUARD_HOME -> "adguard_home"
@@ -86,6 +87,7 @@ object BackupServiceTypeMapper {
     fun serviceType(key: String): ServiceType? {
         val normalized = key.lowercase().trim()
         return when (normalized) {
+            "grafana" -> ServiceType.GRAFANA
             "portainer" -> ServiceType.PORTAINER
             "pihole" -> ServiceType.PIHOLE
             "adguard_home", "adguardhome" -> ServiceType.ADGUARD_HOME

@@ -37,7 +37,8 @@ enum class DashboardTileKey {
     KOMODO,
     UPTIME_KUMA,
     PLEX,
-    SEERR
+    SEERR,
+    GRAFANA
 }
 
 @Serializable

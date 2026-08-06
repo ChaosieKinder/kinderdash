@@ -1878,4 +1878,5 @@
     <string name="truenas_no_pools">No pools returned by TrueNAS.</string>
     <string name="truenas_no_disks">No disks returned by TrueNAS.</string>
     <string name="kinderdash_widget_description">Homelab status at a glance</string>
+    <string name="service_grafana">Grafana</string>
 </resources>

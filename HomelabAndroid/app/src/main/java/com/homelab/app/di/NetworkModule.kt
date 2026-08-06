@@ -270,4 +270,10 @@ object NetworkModule {
     fun provideCalagopusApi(retrofit: Retrofit): com.homelab.app.data.remote.api.CalagopusApi {
         return retrofit.create(com.homelab.app.data.remote.api.CalagopusApi::class.java)
     }
+
+    @Provides
+    @Singleton
+    fun provideGrafanaApi(retrofit: Retrofit): com.homelab.app.data.remote.api.GrafanaApi {
+        return retrofit.create(com.homelab.app.data.remote.api.GrafanaApi::class.java)
+    }
 }

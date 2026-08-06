@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
@@ -31,6 +32,7 @@ fun isThemeDark(): Boolean = MaterialTheme.colorScheme.background.luminance() < 
 val ServiceType.primaryColor: Color
     @Composable
     get() = when (this) {
+        ServiceType.GRAFANA -> Color(0xFFF46800)
         ServiceType.PORTAINER -> Color(0xFF13B5EA)
         ServiceType.PIHOLE -> Color(0xFFCD2326)
         ServiceType.ADGUARD_HOME -> Color(0xFF34C759)
@@ -71,6 +73,7 @@ val ServiceType.primaryColor: Color
 val ServiceType.backgroundColor: Color
     @Composable
     get() = when (this) {
+        ServiceType.GRAFANA -> Color(0xFFF46800).copy(alpha = 0.12f)
         ServiceType.PORTAINER -> Color(0xFF13B5EA).copy(alpha = 0.12f)
         ServiceType.PIHOLE -> Color(0xFFCD2326).copy(alpha = 0.12f)
         ServiceType.ADGUARD_HOME -> Color(0xFF34C759).copy(alpha = 0.12f)
@@ -110,6 +113,7 @@ val ServiceType.backgroundColor: Color
 
 val ServiceType.iconUrl: String
     get() = when (this) {
+        ServiceType.GRAFANA -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/grafana.png"
         ServiceType.PORTAINER -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/portainer.png"
         ServiceType.PIHOLE -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/pi-hole.png"
         ServiceType.ADGUARD_HOME -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/adguard-home.png"
@@ -213,6 +217,7 @@ val ServiceType.iconCandidates: List<String>
 
 val ServiceType.fallbackIcon: ImageVector
     get() = when (this) {
+        ServiceType.GRAFANA -> Icons.Default.Insights
         ServiceType.PORTAINER -> Icons.Default.Widgets
         ServiceType.PIHOLE -> Icons.Default.Security
         ServiceType.ADGUARD_HOME -> Icons.Default.Security

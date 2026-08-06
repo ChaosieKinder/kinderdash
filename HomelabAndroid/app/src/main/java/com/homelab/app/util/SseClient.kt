@@ -22,6 +22,7 @@ class SseClient @Inject constructor(
             .addHeader("Accept", "text/event-stream")
             .addHeader("X-Homelab-Instance-Id", instanceId)
             .addHeader("X-Homelab-Service", when(serviceType) {
+                ServiceType.GRAFANA -> "Grafana"
                 ServiceType.PORTAINER -> "Portainer"
                 ServiceType.PIHOLE -> "Pihole"
                 ServiceType.ADGUARD_HOME -> "AdGuardHome"

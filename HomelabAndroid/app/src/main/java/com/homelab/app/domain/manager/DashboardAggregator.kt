@@ -1,5 +1,6 @@
 package com.homelab.app.domain.manager
 
+import com.homelab.app.data.repository.GrafanaRepository
 import com.homelab.app.data.repository.KomodoRepository
 import com.homelab.app.data.repository.MediaArrRepository
 import com.homelab.app.data.repository.PlexRepository
@@ -44,7 +45,8 @@ class DashboardAggregator @Inject constructor(
     private val komodo: KomodoRepository,
     private val uptimeKuma: UptimeKumaRepository,
     private val plex: PlexRepository,
-    private val mediaArr: MediaArrRepository
+    private val mediaArr: MediaArrRepository,
+    private val grafana: GrafanaRepository
 ) {
 
     suspend fun load(nowMillis: Long): DashboardState = coroutineScope {
@@ -53,7 +55,8 @@ class DashboardAggregator @Inject constructor(
             async { komodoTile() },
             async { uptimeKumaTile() },
             async { plexTile() },
-            async { seerrTile() }
+            async { seerrTile() },
+            async { grafanaTile() }
         ).map { it.await() }
 
         DashboardState(tiles = tiles, generatedAtMillis = nowMillis)
@@ -111,6 +114,20 @@ class DashboardAggregator @Inject constructor(
                     value = summary.pendingRequests,
                     // Something waiting on you, not something broken.
                     severity = if (summary.pendingRequests > 0) TileSeverity.WARNING else TileSeverity.GOOD
+                )
+            )
+        }
+
+    private suspend fun grafanaTile(): DashboardTile =
+        tile(DashboardTileKey.GRAFANA, ServiceType.GRAFANA) { instanceId ->
+            val summary = grafana.getSummary(instanceId)
+            listOf(
+                TileMetric(
+                    label = "Firing",
+                    value = summary.firingAlerts,
+                    // A firing Grafana alert is something you configured to demand attention, so it
+                    // gets the same weight as an unhealthy container rather than a softer warning.
+                    severity = if (summary.firingAlerts > 0) TileSeverity.DANGER else TileSeverity.GOOD
                 )
             )
         }

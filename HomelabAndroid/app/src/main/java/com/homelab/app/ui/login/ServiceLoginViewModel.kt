@@ -11,6 +11,7 @@ import com.homelab.app.data.repository.DockmonRepository
 import com.homelab.app.data.repository.GiteaRepository
 import com.homelab.app.data.repository.LinuxUpdateRepository
 import com.homelab.app.data.repository.CraftyRepository
+import com.homelab.app.data.repository.GrafanaRepository
 import com.homelab.app.data.repository.HealthchecksRepository
 import com.homelab.app.data.repository.JellystatRepository
 import com.homelab.app.data.repository.KomodoRepository
@@ -68,6 +69,7 @@ class ServiceLoginViewModel @Inject constructor(
     private val unifiRepository: UnifiRepository,
     private val nginxProxyManagerRepository: NginxProxyManagerRepository,
     private val healthchecksRepository: HealthchecksRepository,
+    private val grafanaRepository: GrafanaRepository,
     private val jellystatRepository: JellystatRepository,
     private val patchmonRepository: PatchmonRepository,
     private val pangolinRepository: PangolinRepository,
@@ -267,6 +269,21 @@ class ServiceLoginViewModel @Inject constructor(
                                 username = trimmedUsername,
                                 fallbackUrl = cleanFallbackUrl,
                                 password = authPassword
+                            )
+                        }
+                        ServiceType.GRAFANA -> {
+                            require(trimmedApiKey.isNotBlank()) { context.getString(R.string.login_error_api_key_required) }
+                            grafanaRepository.authenticate(cleanUrl, trimmedApiKey, allowSelfSigned = allowSelfSigned)
+                            ServiceInstance(
+                                id = instanceId,
+                                type = serviceType,
+                                label = normalizedLabel,
+                                url = cleanUrl,
+                                // Stored as token, not apiKey: AuthInterceptor sends it as a bearer
+                                // token, which is what a Grafana service account issues.
+                                token = trimmedApiKey,
+                                fallbackUrl = cleanFallbackUrl,
+                                allowSelfSigned = allowSelfSigned
                             )
                         }
                         ServiceType.HEALTHCHECKS -> {

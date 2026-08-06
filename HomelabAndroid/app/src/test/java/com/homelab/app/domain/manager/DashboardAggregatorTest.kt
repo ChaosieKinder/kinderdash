@@ -1,5 +1,7 @@
 package com.homelab.app.domain.manager
 
+import com.homelab.app.data.repository.GrafanaRepository
+import com.homelab.app.data.repository.GrafanaSummary
 import com.homelab.app.data.repository.KomodoContainerSummary
 import com.homelab.app.data.repository.KomodoDashboardData
 import com.homelab.app.data.repository.KomodoRepository
@@ -33,8 +35,9 @@ class DashboardAggregatorTest {
     private val uptimeKuma: UptimeKumaRepository = mockk()
     private val plex: PlexRepository = mockk()
     private val mediaArr: MediaArrRepository = mockk()
+    private val grafana: GrafanaRepository = mockk()
 
-    private fun aggregator() = DashboardAggregator(serviceInstances, komodo, uptimeKuma, plex, mediaArr)
+    private fun aggregator() = DashboardAggregator(serviceInstances, komodo, uptimeKuma, plex, mediaArr, grafana)
 
     private fun instance(type: ServiceType, label: String = "") = ServiceInstance(
         id = "${type.name.lowercase()}-1",
@@ -49,11 +52,13 @@ class DashboardAggregatorTest {
         coEvery { serviceInstances.getPreferredInstance(ServiceType.UPTIME_KUMA) } returns instance(ServiceType.UPTIME_KUMA)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.PLEX) } returns instance(ServiceType.PLEX)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.JELLYSEERR) } returns instance(ServiceType.JELLYSEERR)
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.GRAFANA) } returns instance(ServiceType.GRAFANA)
 
         coEvery { komodo.getDashboard(any()) } returns komodoDashboard(stopped = 0, unhealthy = 0)
         coEvery { uptimeKuma.getSummary(any()) } returns UptimeKumaSummary(upCount = 12, totalCount = 12)
         coEvery { plex.getSummary(any()) } returns PlexSummary(0, 0, 0)
         coEvery { mediaArr.getSeerrSummary(any()) } returns SeerrSummary(pendingRequests = 0, totalRequests = 40)
+        coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 3)
     }
 
     private fun komodoDashboard(stopped: Int, unhealthy: Int): KomodoDashboardData {
@@ -79,7 +84,7 @@ class DashboardAggregatorTest {
 
         val state = aggregator().load(nowMillis = 1_000L)
 
-        assertEquals(4, state.tiles.size)
+        assertEquals(5, state.tiles.size)
         assertEquals(1_000L, state.generatedAtMillis)
         assertFalse(state.hasProblem)
         assertFalse(state.allUnavailable)
@@ -127,8 +132,8 @@ class DashboardAggregatorTest {
         assertTrue(plexTile.status is TileStatus.Unavailable)
         assertEquals("connection refused", (plexTile.status as TileStatus.Unavailable).message)
 
-        // The whole point: the other three still carry real data.
-        listOf(DashboardTileKey.KOMODO, DashboardTileKey.UPTIME_KUMA, DashboardTileKey.SEERR).forEach { key ->
+        // The whole point: every other tile still carries real data.
+        listOf(DashboardTileKey.KOMODO, DashboardTileKey.UPTIME_KUMA, DashboardTileKey.SEERR, DashboardTileKey.GRAFANA).forEach { key ->
             assertTrue("$key should still be Ready", state.tiles.single { it.key == key }.status is TileStatus.Ready)
         }
         assertFalse(state.allUnavailable)
@@ -143,6 +148,32 @@ class DashboardAggregatorTest {
 
         assertEquals(TileStatus.NotConfigured, seerr.status)
         assertEquals(ServiceType.JELLYSEERR.displayName, seerr.title)
+    }
+
+    @Test
+    fun `firing grafana alerts are danger`() = runTest {
+        happyPath()
+        coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 2, totalAlerts = 5)
+
+        val firing = metric(aggregator().load(0L).tiles, DashboardTileKey.GRAFANA, "Firing")
+
+        assertEquals(2, firing.value)
+        assertEquals(TileSeverity.DANGER, firing.severity)
+        assertTrue(aggregator().load(0L).hasProblem)
+    }
+
+    @Test
+    fun `silenced grafana alerts are not counted as firing`() = runTest {
+        // GrafanaAlert.isFiring only counts state == "active"; silencing an alert is an explicit
+        // statement that you do not want to be told about it, so the widget must respect that.
+        happyPath()
+        coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 4)
+
+        val firing = metric(aggregator().load(0L).tiles, DashboardTileKey.GRAFANA, "Firing")
+
+        assertEquals(0, firing.value)
+        assertEquals(TileSeverity.GOOD, firing.severity)
+        assertFalse(aggregator().load(0L).hasProblem)
     }
 
     @Test
@@ -162,6 +193,7 @@ class DashboardAggregatorTest {
         coEvery { uptimeKuma.getSummary(any()) } throws boom
         coEvery { plex.getSummary(any()) } throws boom
         coEvery { mediaArr.getSeerrSummary(any()) } throws boom
+        coEvery { grafana.getSummary(any()) } throws boom
 
         val state = aggregator().load(0L)
 

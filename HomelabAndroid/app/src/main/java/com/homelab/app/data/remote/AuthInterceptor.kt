@@ -332,6 +332,13 @@ class AuthInterceptor @Inject constructor(
         hasAuthorization: Boolean
     ) {
         when (instance.type) {
+            ServiceType.GRAFANA -> {
+                // Grafana service account token. Grafana 9+ deprecated the old API keys in favour
+                // of service accounts, but both present as a plain bearer token here.
+                if (!hasAuthorization && instance.token.isNotBlank()) {
+                    builder.addHeader("Authorization", "Bearer ${instance.token}")
+                }
+            }
             ServiceType.PORTAINER -> {
                 if (!instance.apiKey.isNullOrBlank()) {
                     builder.addHeader("X-API-Key", instance.apiKey)
