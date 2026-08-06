@@ -134,14 +134,11 @@ class KinderDashWidget : GlanceAppWidget() {
 
     @androidx.compose.runtime.Composable
     private fun Header(state: DashboardState?) {
-        // Unlike the tiles, the header has no card behind it, so on a light or busy wallpaper it
-        // would be the one unreadable element. A pill of its own keeps it legible without
-        // reintroducing a full-width slab.
+        // No card behind the header — it reads as a label on the wallpaper rather than a UI
+        // element, which is what makes the widget feel like part of the home screen. The tiles
+        // still carry their own backgrounds, so the numbers keep their contrast regardless.
         Row(
-            modifier = GlanceModifier
-                .background(Card)
-                .cornerRadius(12.dp)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -151,8 +148,9 @@ class KinderDashWidget : GlanceAppWidget() {
                     fontSize = 16.sp(),
                     fontWeight = FontWeight.Bold
                 ),
+                // Pushes the timestamp to the far edge.
+                modifier = GlanceModifier.defaultWeight()
             )
-            Spacer(GlanceModifier.size(8.dp))
             Text(
                 text = state?.let { relativeAge(it.generatedAtMillis) } ?: "never",
                 style = TextStyle(color = ColorProvider(Muted), fontSize = 12.sp())
