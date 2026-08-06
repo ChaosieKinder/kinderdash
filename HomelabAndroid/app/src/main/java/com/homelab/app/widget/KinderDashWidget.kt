@@ -82,11 +82,12 @@ class KinderDashWidget : GlanceAppWidget() {
         val tiles = state?.let(::visibleTiles).orEmpty()
         val twoColumn = LocalSize.current.width >= WIDE.width || tiles.size > 4
 
+        // No background on the container: the widget floats its cards directly on the wallpaper.
+        // The cards stay opaque so the numbers keep their contrast whatever is behind them — the
+        // transparency is meant to remove the slab, not to make the content compete with a photo.
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(Surface)
-                .cornerRadius(20.dp)
                 .padding(14.dp)
                 .clickable(actionRunCallback<RefreshWidgetAction>())
         ) {
@@ -94,10 +95,14 @@ class KinderDashWidget : GlanceAppWidget() {
             Spacer(GlanceModifier.size(10.dp))
 
             if (state == null || tiles.isEmpty()) {
-                Text(
-                    text = "Tap to load",
-                    style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
-                )
+                Column(
+                    modifier = GlanceModifier.background(Card).cornerRadius(14.dp).padding(10.dp)
+                ) {
+                    Text(
+                        text = "Tap to load",
+                        style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
+                    )
+                }
                 return@Column
             }
 
@@ -129,8 +134,14 @@ class KinderDashWidget : GlanceAppWidget() {
 
     @androidx.compose.runtime.Composable
     private fun Header(state: DashboardState?) {
+        // Unlike the tiles, the header has no card behind it, so on a light or busy wallpaper it
+        // would be the one unreadable element. A pill of its own keeps it legible without
+        // reintroducing a full-width slab.
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier
+                .background(Card)
+                .cornerRadius(12.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -140,8 +151,8 @@ class KinderDashWidget : GlanceAppWidget() {
                     fontSize = 16.sp(),
                     fontWeight = FontWeight.Bold
                 ),
-                modifier = GlanceModifier.defaultWeight()
             )
+            Spacer(GlanceModifier.size(8.dp))
             Text(
                 text = state?.let { relativeAge(it.generatedAtMillis) } ?: "never",
                 style = TextStyle(color = ColorProvider(Muted), fontSize = 12.sp())
