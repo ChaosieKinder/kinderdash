@@ -708,26 +708,17 @@ fun SettingsScreen(
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 8.dp)
                 )
 
+                // Upstream's personal Telegram and Reddit are gone — they were contact details for
+                // someone who has no connection to this fork, and tapping them would have sent a
+                // bug report to a stranger. One link, to this fork's own issues.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     ContactChip(
-                        label = stringResource(R.string.settings_contact_telegram),
-                        iconUrl = "https://cdn.jsdelivr.net/gh/selfhst/icons/png/telegram.png",
-                        onClick = { uriHandler.openUri("https://t.me/finalyxre") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ContactChip(
-                        label = stringResource(R.string.settings_contact_reddit),
-                        iconUrl = "https://cdn.jsdelivr.net/gh/selfhst/icons/png/reddit.png",
-                        onClick = { uriHandler.openUri("https://www.reddit.com/user/finalyxre/") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ContactChip(
                         label = stringResource(R.string.settings_contact_repository),
                         iconUrl = "https://cdn.jsdelivr.net/gh/selfhst/icons/png/github.png",
-                        onClick = { uriHandler.openUri("https://github.com/JohnnWi/homelab-project") },
+                        onClick = { uriHandler.openUri("https://github.com/ChaosieKinder/kinderdash/issues") },
                         modifier = Modifier.weight(1f)
                     )
                 }
