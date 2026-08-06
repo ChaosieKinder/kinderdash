@@ -56,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -94,25 +95,42 @@ fun ServiceLoginScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
 
-    var label by remember { mutableStateOf(serviceType.displayName) }
-    var url by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var mfaCode by remember { mutableStateOf("") }
-    var proxmoxRealm by remember { mutableStateOf("pam") }
-    var proxmoxOtp by remember { mutableStateOf("") }
-    var proxmoxUseApiToken by remember { mutableStateOf(false) }
-    var fallbackUrl by remember { mutableStateOf("") }
-    var allowSelfSigned by remember { mutableStateOf(true) }
-    var showSecret by remember { mutableStateOf(false) }
-    var hasSubmitted by remember { mutableStateOf(false) }
+    // rememberSaveable, not remember: rotating the device recreates the Activity and discards the
+    // composition, so plain `remember` threw away everything typed so far.
+    //
+    // Non-secret fields only. Secrets are held in the ViewModel below — see the note there for why
+    // they must not go through saved instance state.
+    var label by rememberSaveable { mutableStateOf(serviceType.displayName) }
+    var url by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var proxmoxRealm by rememberSaveable { mutableStateOf("pam") }
+    var proxmoxUseApiToken by rememberSaveable { mutableStateOf(false) }
+    var fallbackUrl by rememberSaveable { mutableStateOf("") }
+    var allowSelfSigned by rememberSaveable { mutableStateOf(true) }
+    var showSecret by rememberSaveable { mutableStateOf(false) }
+    var hasSubmitted by rememberSaveable { mutableStateOf(false) }
+
+    // Credentials survive rotation via the ViewModel, which outlives Activity recreation WITHOUT
+    // being written anywhere. rememberSaveable would have been one word shorter, but it stores
+    // through onSaveInstanceState — a system-managed Bundle that can be persisted for task
+    // restore. Putting an API key or password there would undo the point of encrypting these at
+    // rest (see CredentialCipher) for the sake of a form that is open for thirty seconds.
+    //
+    // Process death clears these, which is the correct behaviour for a password field.
+    var password by viewModel.credentials::password
+    var apiKey by viewModel.credentials::apiKey
+    var mfaCode by viewModel.credentials::mfaCode
+    var proxmoxOtp by viewModel.credentials::proxmoxOtp
 
     val coroutineScope = rememberCoroutineScope()
     val shakeOffset = remember { Animatable(0f) }
 
     LaunchedEffect(existingInstance?.id) {
         val instance = existingInstance ?: return@LaunchedEffect
+        // Populate once per ViewModel, not once per composition — otherwise rotating mid-edit
+        // silently reverts the form to the stored values.
+        if (viewModel.hasPrefilled) return@LaunchedEffect
+        viewModel.hasPrefilled = true
         label = instance.label
         url = instance.url
         if (serviceType == ServiceType.PROXMOX) {

@@ -1,6 +1,9 @@
 package com.homelab.app.ui.login
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -89,6 +92,41 @@ class ServiceLoginViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val existingInstanceId: String? = savedStateHandle["instanceId"]
+
+    /**
+     * Secret form fields, held here rather than in the composable.
+     *
+     * A ViewModel survives Activity recreation (rotation) but is never serialised anywhere, which
+     * is exactly the lifetime a credential entry field wants: it outlives a rotation and dies with
+     * the process. The alternative, rememberSaveable, routes values through onSaveInstanceState —
+     * a system Bundle that can be persisted for task restore — which would put plaintext API keys
+     * and passwords somewhere we deliberately keep them out of.
+     */
+    class CredentialFields {
+        var password by mutableStateOf("")
+        var apiKey by mutableStateOf("")
+        var mfaCode by mutableStateOf("")
+        var proxmoxOtp by mutableStateOf("")
+
+        fun clear() {
+            password = ""
+            apiKey = ""
+            mfaCode = ""
+            proxmoxOtp = ""
+        }
+    }
+
+    val credentials = CredentialFields()
+
+    /**
+     * Whether the edit form has already been populated from the stored instance.
+     *
+     * Lives here rather than in the composable because it must survive rotation: the prefill
+     * LaunchedEffect re-runs on every fresh composition, and without this guard a rotation would
+     * overwrite whatever the user had edited with the saved values again — the same bug as the
+     * fields clearing, one layer up.
+     */
+    var hasPrefilled: Boolean = false
 
     private val _existingInstance = MutableStateFlow<ServiceInstance?>(null)
     val existingInstance: StateFlow<ServiceInstance?> = _existingInstance
