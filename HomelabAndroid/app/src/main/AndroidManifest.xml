@@ -129,6 +129,32 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Full-page homelab widget (the reason this fork exists). -->
+        <receiver
+            android:name=".widget.KinderDashWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/kinderdash_widget_info" />
+        </receiver>
+
+        <!-- WorkManager is initialised from MiaApp (Configuration.Provider) so Hilt can construct
+             @HiltWorker workers. The default startup initializer must be removed or it wins the
+             race and DashboardRefreshWorker fails to instantiate. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
     </application>
 
 </manifest>

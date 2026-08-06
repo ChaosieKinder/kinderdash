@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Full-page widget: the minimum sizes are large on purpose, so the launcher offers it at a size
+  worth having rather than letting it be placed as a 2x2 tile it was never designed for.
+
+  updatePeriodMillis is 0 — refreshing is WorkManager's job (DashboardRefreshWorker). The AppWidget
+  framework's own period is capped at 30 minutes and ignores network constraints, so using both
+  would mean two schedules fighting, one of which wakes the device to fail while offline.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="250dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="4"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="180dp"
+    android:maxResizeWidth="640dp"
+    android:maxResizeHeight="640dp"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/kinderdash_widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:updatePeriodMillis="0" />

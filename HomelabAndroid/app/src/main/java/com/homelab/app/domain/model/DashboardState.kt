@@ -1,5 +1,7 @@
 package com.homelab.app.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * The typed, cross-service snapshot the home-screen widget renders.
  *
@@ -10,6 +12,7 @@ package com.homelab.app.domain.model
  * Kept deliberately free of Android and Glance types so it can be unit-tested on the JVM and reused
  * by anything else that wants a homelab summary.
  */
+@Serializable
 data class DashboardState(
     val tiles: List<DashboardTile>,
     val generatedAtMillis: Long
@@ -29,6 +32,7 @@ data class DashboardState(
 }
 
 /** Stable identity for a tile, so the widget can order and lay out independently of labels. */
+@Serializable
 enum class DashboardTileKey {
     KOMODO,
     UPTIME_KUMA,
@@ -36,6 +40,7 @@ enum class DashboardTileKey {
     SEERR
 }
 
+@Serializable
 data class DashboardTile(
     val key: DashboardTileKey,
     /** The instance's own label where it has one, else the service's display name. */
@@ -43,11 +48,14 @@ data class DashboardTile(
     val status: TileStatus
 )
 
+@Serializable
 sealed interface TileStatus {
     /** Fetched successfully. [metrics] may legitimately be empty. */
+    @Serializable
     data class Ready(val metrics: List<TileMetric>) : TileStatus
 
     /** No instance of this service is set up — render nothing rather than an error. */
+    @Serializable
     data object NotConfigured : TileStatus
 
     /**
@@ -55,15 +63,18 @@ sealed interface TileStatus {
      * should show a stale-but-labelled value here rather than a blank, and blank rather than a
      * spinner: a widget that briefly says "unavailable" is more useful than one that lies.
      */
+    @Serializable
     data class Unavailable(val message: String?) : TileStatus
 }
 
+@Serializable
 data class TileMetric(
     val label: String,
     val value: Int,
     val severity: TileSeverity
 )
 
+@Serializable
 enum class TileSeverity {
     /** Nothing to see. */
     GOOD,
