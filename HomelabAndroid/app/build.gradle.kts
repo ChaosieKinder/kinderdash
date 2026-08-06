@@ -115,6 +115,10 @@ dependencies {
     ksp("com.google.dagger:hilt-android-compiler:2.59.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("androidx.hilt:hilt-work:1.2.0")
+    // Required for @HiltWorker. The Dagger compiler above does NOT process it — androidx.hilt has
+    // its own processor, and without it no factory entry is generated, HiltWorkerFactory returns
+    // null from createWorker, and WorkManager silently marks the job FAILED with no stack trace.
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     // Networking (Retrofit, OkHttp, Kotlinx Serialization)
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
