@@ -28,6 +28,8 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.homelab.app.data.local.DashboardSnapshotStore
+import com.homelab.app.data.repository.LocalPreferencesRepository
+import kotlinx.coroutines.flow.first
 import com.homelab.app.domain.model.DashboardState
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.TileMetric
@@ -61,22 +63,24 @@ class KinderDashWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(COMPACT, WIDE, LARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val snapshot = runCatching {
-            EntryPointAccessors
-                .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
-                .dashboardSnapshotStore()
-                .load()
+        val entryPoint = runCatching {
+            EntryPointAccessors.fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
         }.getOrNull()
+
+        val snapshot = runCatching { entryPoint?.dashboardSnapshotStore()?.load() }.getOrNull()
+        val title = runCatching { entryPoint?.localPreferencesRepository()?.widgetTitle?.first() }
+            .getOrNull()
+            ?: LocalPreferencesRepository.DEFAULT_WIDGET_TITLE
 
         provideContent {
             GlanceTheme {
-                DashboardBody(snapshot)
+                DashboardBody(snapshot, title)
             }
         }
     }
 
     @androidx.compose.runtime.Composable
-    private fun DashboardBody(state: DashboardState?) {
+    private fun DashboardBody(state: DashboardState?, title: String) {
         // Two columns whenever there is room. Also forced once there are more than four tiles,
         // because a single column of eight does not fit any of the target sizes.
         val tiles = state?.let(::visibleTiles).orEmpty()
@@ -91,7 +95,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 .padding(14.dp)
                 .clickable(actionRunCallback<RefreshWidgetAction>())
         ) {
-            Header(state)
+            Header(state, title)
             Spacer(GlanceModifier.size(10.dp))
 
             if (state == null || tiles.isEmpty()) {
@@ -133,7 +137,7 @@ class KinderDashWidget : GlanceAppWidget() {
     }
 
     @androidx.compose.runtime.Composable
-    private fun Header(state: DashboardState?) {
+    private fun Header(state: DashboardState?, title: String) {
         // No card behind the header — it reads as a label on the wallpaper rather than a UI
         // element, which is what makes the widget feel like part of the home screen. The tiles
         // still carry their own backgrounds, so the numbers keep their contrast regardless.
@@ -142,7 +146,7 @@ class KinderDashWidget : GlanceAppWidget() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Homelab",
+                text = title,
                 style = TextStyle(
                     color = ColorProvider(Foreground),
                     fontSize = 16.sp(),
@@ -280,4 +284,5 @@ internal fun relativeAge(generatedAtMillis: Long, nowMillis: Long = System.curre
 @InstallIn(SingletonComponent::class)
 interface WidgetEntryPoint {
     fun dashboardSnapshotStore(): DashboardSnapshotStore
+    fun localPreferencesRepository(): LocalPreferencesRepository
 }

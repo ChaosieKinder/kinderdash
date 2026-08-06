@@ -1,5 +1,10 @@
 package com.homelab.app.ui.settings
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -70,6 +75,7 @@ fun SettingsScreen(
     val preferredInstanceIdByType by viewModel.preferredInstanceIdByType.collectAsStateWithLifecycle()
     val hiddenServices by viewModel.hiddenServices.collectAsStateWithLifecycle()
     val serviceOrder by viewModel.serviceOrder.collectAsStateWithLifecycle()
+    val widgetTitle by viewModel.widgetTitle.collectAsStateWithLifecycle()
     val isPinSet by viewModel.isPinSet.collectAsStateWithLifecycle()
 
 
@@ -208,6 +214,34 @@ fun SettingsScreen(
                         onClick = onNavigateToArrServices
                     )
                 }
+            }
+
+            // --- WIDGET ---
+            item {
+                Text(
+                    text = stringResource(R.string.settings_widget_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 8.dp)
+                )
+
+                // Local editing state, committed on each keystroke. Seeded from the stored value
+                // but keyed on it, so an external change is picked up without clobbering typing.
+                var draft by remember(widgetTitle) { mutableStateOf(widgetTitle) }
+
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = {
+                        draft = it
+                        viewModel.setWidgetTitle(it)
+                    },
+                    label = { Text(stringResource(R.string.settings_widget_title_label)) },
+                    supportingText = { Text(stringResource(R.string.settings_widget_title_hint)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             // --- THEME SELECTOR ---

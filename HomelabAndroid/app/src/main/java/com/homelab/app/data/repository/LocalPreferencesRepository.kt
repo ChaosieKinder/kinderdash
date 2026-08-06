@@ -52,6 +52,7 @@ class LocalPreferencesRepository @Inject constructor(
     private val dataStore = context.dataStore
 
     private val THEME_KEY = stringPreferencesKey("theme_mode")
+    private val WIDGET_TITLE_KEY = stringPreferencesKey("widget_title")
     private val LANG_KEY = stringPreferencesKey("language_mode")
     private val HIDDEN_SERVICES_KEY = stringPreferencesKey("hidden_services")
     private val SERVICE_ORDER_KEY = stringPreferencesKey("service_order")
@@ -100,6 +101,29 @@ class LocalPreferencesRepository @Inject constructor(
         .map { preferences ->
             LanguageMode.fromCode(preferences[LANG_KEY])
         }
+
+    /**
+     * Heading shown on the home-screen widget. Blank falls back to [DEFAULT_WIDGET_TITLE] rather
+     * than rendering an empty row, so clearing the field can't leave the widget looking broken.
+     */
+    val widgetTitle: Flow<String> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[WIDGET_TITLE_KEY]?.takeIf { it.isNotBlank() } ?: DEFAULT_WIDGET_TITLE
+        }
+
+    suspend fun setWidgetTitle(title: String) {
+        dataStore.edit { preferences ->
+            val trimmed = title.trim()
+            if (trimmed.isEmpty()) {
+                preferences.remove(WIDGET_TITLE_KEY)
+            } else {
+                preferences[WIDGET_TITLE_KEY] = trimmed
+            }
+        }
+    }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { preferences ->
@@ -615,5 +639,10 @@ class LocalPreferencesRepository @Inject constructor(
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         return parseStoredServiceType(trimmed)?.name ?: trimmed
+    }
+
+    companion object {
+        /** Shown on the widget when the user has not set a title of their own. */
+        const val DEFAULT_WIDGET_TITLE = "Homelab"
     }
 }

@@ -2,6 +2,8 @@ package com.homelab.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.glance.appwidget.updateAll
+import com.homelab.app.widget.KinderDashWidget
 import com.homelab.app.BuildConfig
 import com.homelab.app.data.repository.LanguageMode
 import com.homelab.app.data.repository.LocalPreferencesRepository
@@ -27,6 +29,7 @@ import org.json.JSONObject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
     private val servicesRepository: ServicesRepository,
     private val localPreferencesRepository: LocalPreferencesRepository,
     private val appIconManager: AppIconManager
@@ -142,6 +145,23 @@ class SettingsViewModel @Inject constructor(
             } finally {
                 _appIconApplying.value = false
             }
+        }
+    }
+
+    val widgetTitle: StateFlow<String> = localPreferencesRepository.widgetTitle
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            LocalPreferencesRepository.DEFAULT_WIDGET_TITLE
+        )
+
+    fun setWidgetTitle(title: String) {
+        viewModelScope.launch {
+            localPreferencesRepository.setWidgetTitle(title)
+            // Re-render the widget directly rather than enqueuing a refresh: the title comes from
+            // preferences, not from the services, so there is nothing to re-fetch. Without this the
+            // change would not appear until the next 15-minute cycle.
+            runCatching { KinderDashWidget().updateAll(appContext) }
         }
     }
 
