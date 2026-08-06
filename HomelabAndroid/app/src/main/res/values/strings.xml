@@ -1886,4 +1886,6 @@
     <string name="login_hint_home_assistant">Create a long-lived access token from your Home Assistant profile, at the bottom of the Security tab.</string>
     <string name="login_hint_nextcloud">Enable the Server Info app, then copy its token from Settings → Administration → Monitoring.</string>
     <string name="login_hint_transmission">Leave the username and password empty unless your Transmission instance has authentication turned on.</string>
+    <string name="settings_restore_hidden_title">Show hidden services</string>
+    <string name="settings_restore_hidden_subtitle">These are hidden from the home screen and from this list. Tap one to bring it back.</string>
 </resources>

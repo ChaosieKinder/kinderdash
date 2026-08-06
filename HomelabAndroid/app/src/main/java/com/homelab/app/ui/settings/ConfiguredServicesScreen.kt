@@ -1,5 +1,8 @@
 package com.homelab.app.ui.settings
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,6 +51,12 @@ fun ConfiguredServicesScreen(
         null -> emptyList()
     }
 
+    // Hidden services are removed from the list outright rather than rendered as full-height cards
+    // you scroll past and reorder around. They come back through the "+" action in the top bar.
+    val visibleServices = groupedServices.filterNot { hiddenServices.contains(it.name) }
+    val hiddenInGroup = groupedServices.filter { hiddenServices.contains(it.name) }
+    var showRestoreSheet by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -63,6 +72,16 @@ fun ConfiguredServicesScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+                actions = {
+                    if (group != null && hiddenInGroup.isNotEmpty()) {
+                        IconButton(onClick = { showRestoreSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.settings_restore_hidden_title)
+                            )
+                        }
                     }
                 }
             )
@@ -104,18 +123,22 @@ fun ConfiguredServicesScreen(
                     )
                 }
             } else {
-                items(groupedServices, key = { it.name }) { type ->
-                    val index = serviceOrder.indexOf(type)
+                items(visibleServices, key = { it.name }) { type ->
+                    // Position within the VISIBLE list, so the arrows disable at the ends of what
+                    // is actually on screen rather than at the ends of the global order.
+                    val index = visibleServices.indexOf(type)
                     ServiceSettingsSection(
                         type = type,
                         instances = instancesByType[type].orEmpty(),
                         preferredInstanceId = preferredInstanceIdByType[type],
-                        isHidden = hiddenServices.contains(type.name),
+                        isHidden = false,
                         canMoveUp = index > 0,
-                        canMoveDown = index in 0 until serviceOrder.lastIndex,
+                        canMoveDown = index in 0 until visibleServices.lastIndex,
                         onToggleVisibility = { viewModel.toggleServiceVisibility(type) },
-                        onMoveUp = { viewModel.moveService(type, -1) },
-                        onMoveDown = { viewModel.moveService(type, 1) },
+                        // Scoped to the visible set: a global one-place move could swap with a
+                        // hidden neighbour and look like nothing happened.
+                        onMoveUp = { viewModel.moveServiceWithin(type, -1, visibleServices.toSet()) },
+                        onMoveDown = { viewModel.moveServiceWithin(type, 1, visibleServices.toSet()) },
                         onAdd = { onNavigateToLogin(type, null) },
                         onEdit = { instance -> onNavigateToLogin(type, instance.id) },
                         onDelete = { instance -> viewModel.deleteInstance(instance.id) },
@@ -125,6 +148,83 @@ fun ConfiguredServicesScreen(
             }
         }
     }
+
+    if (showRestoreSheet) {
+        RestoreHiddenServicesDialog(
+            hidden = hiddenInGroup,
+            onRestore = { type ->
+                viewModel.toggleServiceVisibility(type)
+                // Close once the last one is restored — leaving an empty dialog open would be a
+                // dead end, since the action that opened it is gone too.
+                if (hiddenInGroup.size <= 1) showRestoreSheet = false
+            },
+            onDismiss = { showRestoreSheet = false }
+        )
+    }
+}
+
+/**
+ * Brings back services hidden from this group.
+ *
+ * Hidden services are no longer rendered in the list at all, so this is the only route back. It
+ * lists them by name only — no instance controls — because the decision here is just "show this
+ * again", and everything else is available once it reappears in the list.
+ */
+@Composable
+private fun RestoreHiddenServicesDialog(
+    hidden: List<ServiceType>,
+    onRestore: (ServiceType) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_restore_hidden_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_restore_hidden_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                hidden.forEach { type ->
+                    Surface(
+                        onClick = { onRestore(type) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = type.displayName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        }
+    )
 }
 
 @Composable

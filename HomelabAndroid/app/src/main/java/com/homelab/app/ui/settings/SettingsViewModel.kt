@@ -157,6 +157,19 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Moves [type] one place within [within], ignoring anything outside that set.
+     *
+     * Needed because the settings list only shows visible services. A plain [moveService] shifts by
+     * one position in the *global* order, so swapping with a hidden neighbour would look like the
+     * button did nothing at all.
+     */
+    fun moveServiceWithin(type: ServiceType, offset: Int, within: Set<ServiceType>) {
+        viewModelScope.launch {
+            localPreferencesRepository.moveServiceWithin(type, offset, within)
+        }
+    }
+
     fun deleteInstance(instanceId: String) {
         viewModelScope.launch {
             servicesRepository.disconnectInstance(instanceId)
