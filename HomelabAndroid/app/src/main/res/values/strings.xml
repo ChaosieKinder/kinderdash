@@ -1882,4 +1882,8 @@
     <string name="service_home_assistant">Home Assistant</string>
     <string name="service_nextcloud">Nextcloud</string>
     <string name="service_transmission">Transmission</string>
+    <string name="login_hint_grafana">Create a service account token in Grafana under Administration → Users and access → Service accounts. Viewer access is enough.</string>
+    <string name="login_hint_home_assistant">Create a long-lived access token from your Home Assistant profile, at the bottom of the Security tab.</string>
+    <string name="login_hint_nextcloud">Enable the Server Info app, then copy its token from Settings → Administration → Monitoring.</string>
+    <string name="login_hint_transmission">Leave the username and password empty unless your Transmission instance has authentication turned on.</string>
 </resources>

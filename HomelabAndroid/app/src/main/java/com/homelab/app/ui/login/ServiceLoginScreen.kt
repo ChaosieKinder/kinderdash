@@ -122,6 +122,13 @@ fun ServiceLoginScreen(
     var mfaCode by viewModel.credentials::mfaCode
     var proxmoxOtp by viewModel.credentials::proxmoxOtp
 
+    // The ViewModel deliberately outlives Activity recreation so rotation doesn't clear the
+    // credential fields — but that means the values also outlive the form unless something clears
+    // them. Dispose is the one point that covers cancel, back, and a successful save alike.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { viewModel.credentials.clear() }
+    }
+
     val coroutineScope = rememberCoroutineScope()
     val shakeOffset = remember { Animatable(0f) }
 
@@ -229,6 +236,10 @@ fun ServiceLoginScreen(
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(24.dp))
 
             val hint = when (serviceType) {
+                ServiceType.GRAFANA -> stringResource(R.string.login_hint_grafana)
+                ServiceType.HOME_ASSISTANT -> stringResource(R.string.login_hint_home_assistant)
+                ServiceType.NEXTCLOUD -> stringResource(R.string.login_hint_nextcloud)
+                ServiceType.TRANSMISSION -> stringResource(R.string.login_hint_transmission)
                 ServiceType.PORTAINER -> stringResource(R.string.login_hint_portainer_multi)
                 ServiceType.PIHOLE -> stringResource(R.string.login_hint_pihole_multi)
                 ServiceType.ADGUARD_HOME -> stringResource(R.string.login_hint_adguard)
@@ -511,6 +522,9 @@ fun ServiceLoginScreen(
             }
 
             if (
+                serviceType == ServiceType.GRAFANA ||
+                serviceType == ServiceType.HOME_ASSISTANT ||
+                serviceType == ServiceType.NEXTCLOUD ||
                 serviceType == ServiceType.PORTAINER ||
                 serviceType == ServiceType.HEALTHCHECKS ||
                 serviceType == ServiceType.PANGOLIN ||
