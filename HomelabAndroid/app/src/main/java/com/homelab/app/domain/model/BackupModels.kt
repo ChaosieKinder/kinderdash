@@ -45,6 +45,9 @@ object BackupServiceTypeMapper {
     fun backupKey(type: ServiceType): String {
         return when (type) {
             ServiceType.GRAFANA -> "grafana"
+            ServiceType.HOME_ASSISTANT -> "home-assistant"
+            ServiceType.NEXTCLOUD -> "nextcloud"
+            ServiceType.TRANSMISSION -> "transmission"
             ServiceType.PORTAINER -> "portainer"
             ServiceType.PIHOLE -> "pihole"
             ServiceType.ADGUARD_HOME -> "adguard_home"
@@ -88,6 +91,9 @@ object BackupServiceTypeMapper {
         val normalized = key.lowercase().trim()
         return when (normalized) {
             "grafana" -> ServiceType.GRAFANA
+            "home-assistant" -> ServiceType.HOME_ASSISTANT
+            "nextcloud" -> ServiceType.NEXTCLOUD
+            "transmission" -> ServiceType.TRANSMISSION
             "portainer" -> ServiceType.PORTAINER
             "pihole" -> ServiceType.PIHOLE
             "adguard_home", "adguardhome" -> ServiceType.ADGUARD_HOME

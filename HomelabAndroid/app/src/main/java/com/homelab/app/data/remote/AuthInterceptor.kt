@@ -332,6 +332,31 @@ class AuthInterceptor @Inject constructor(
         hasAuthorization: Boolean
     ) {
         when (instance.type) {
+            ServiceType.HOME_ASSISTANT -> {
+                // Long-lived access token.
+                if (!hasAuthorization && instance.token.isNotBlank()) {
+                    builder.addHeader("Authorization", "Bearer ${instance.token}")
+                }
+            }
+            ServiceType.NEXTCLOUD -> {
+                // serverinfo uses its own header, not Authorization. OCS-APIRequest is mandatory —
+                // without it Nextcloud answers with a login page instead of JSON.
+                if (instance.token.isNotBlank()) {
+                    builder.addHeader("NC-Token", instance.token)
+                }
+                builder.addHeader("OCS-APIRequest", "true")
+            }
+            ServiceType.TRANSMISSION -> {
+                // Optional: many LAN instances run without auth. The session-id handshake is
+                // handled in TransmissionRepository, not here.
+                val user = instance.username
+                if (!hasAuthorization && !user.isNullOrBlank()) {
+                    builder.addHeader(
+                        "Authorization",
+                        okhttp3.Credentials.basic(user, instance.password.orEmpty())
+                    )
+                }
+            }
             ServiceType.GRAFANA -> {
                 // Grafana service account token. Grafana 9+ deprecated the old API keys in favour
                 // of service accounts, but both present as a plain bearer token here.

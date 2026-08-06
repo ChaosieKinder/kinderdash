@@ -1879,4 +1879,7 @@
     <string name="truenas_no_disks">No disks returned by TrueNAS.</string>
     <string name="kinderdash_widget_description">Homelab status at a glance</string>
     <string name="service_grafana">Grafana</string>
+    <string name="service_home_assistant">Home Assistant</string>
+    <string name="service_nextcloud">Nextcloud</string>
+    <string name="service_transmission">Transmission</string>
 </resources>

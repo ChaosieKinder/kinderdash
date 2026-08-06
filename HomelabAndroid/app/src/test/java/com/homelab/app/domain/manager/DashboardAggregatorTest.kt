@@ -1,6 +1,12 @@
 package com.homelab.app.domain.manager
 
 import com.homelab.app.data.repository.GrafanaRepository
+import com.homelab.app.data.repository.HomeAssistantRepository
+import com.homelab.app.data.repository.HomeAssistantSummary
+import com.homelab.app.data.repository.NextcloudRepository
+import com.homelab.app.data.repository.NextcloudSummary
+import com.homelab.app.data.repository.TransmissionRepository
+import com.homelab.app.data.repository.TransmissionSummary
 import com.homelab.app.data.repository.GrafanaSummary
 import com.homelab.app.data.repository.KomodoContainerSummary
 import com.homelab.app.data.repository.KomodoDashboardData
@@ -36,8 +42,12 @@ class DashboardAggregatorTest {
     private val plex: PlexRepository = mockk()
     private val mediaArr: MediaArrRepository = mockk()
     private val grafana: GrafanaRepository = mockk()
+    private val homeAssistant: HomeAssistantRepository = mockk()
+    private val nextcloud: NextcloudRepository = mockk()
+    private val transmission: TransmissionRepository = mockk()
 
-    private fun aggregator() = DashboardAggregator(serviceInstances, komodo, uptimeKuma, plex, mediaArr, grafana)
+    private fun aggregator() = DashboardAggregator(serviceInstances, komodo, uptimeKuma, plex, mediaArr, grafana,
+        homeAssistant, nextcloud, transmission)
 
     private fun instance(type: ServiceType, label: String = "") = ServiceInstance(
         id = "${type.name.lowercase()}-1",
@@ -53,12 +63,18 @@ class DashboardAggregatorTest {
         coEvery { serviceInstances.getPreferredInstance(ServiceType.PLEX) } returns instance(ServiceType.PLEX)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.JELLYSEERR) } returns instance(ServiceType.JELLYSEERR)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.GRAFANA) } returns instance(ServiceType.GRAFANA)
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.HOME_ASSISTANT) } returns instance(ServiceType.HOME_ASSISTANT)
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.NEXTCLOUD) } returns instance(ServiceType.NEXTCLOUD)
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.TRANSMISSION) } returns instance(ServiceType.TRANSMISSION)
 
         coEvery { komodo.getDashboard(any()) } returns komodoDashboard(stopped = 0, unhealthy = 0)
         coEvery { uptimeKuma.getSummary(any()) } returns UptimeKumaSummary(upCount = 12, totalCount = 12)
         coEvery { plex.getSummary(any()) } returns PlexSummary(0, 0, 0)
         coEvery { mediaArr.getSeerrSummary(any()) } returns SeerrSummary(pendingRequests = 0, totalRequests = 40)
         coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 3)
+        coEvery { homeAssistant.getSummary(any()) } returns HomeAssistantSummary(lightsOn = 2, unavailableEntities = 0, totalEntities = 300)
+        coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000)
+        coEvery { transmission.getSummary(any()) } returns TransmissionSummary(activeTorrents = 3, erroredTorrents = 0, totalTorrents = 10)
     }
 
     private fun komodoDashboard(stopped: Int, unhealthy: Int): KomodoDashboardData {
@@ -84,7 +100,7 @@ class DashboardAggregatorTest {
 
         val state = aggregator().load(nowMillis = 1_000L)
 
-        assertEquals(5, state.tiles.size)
+        assertEquals(8, state.tiles.size)
         assertEquals(1_000L, state.generatedAtMillis)
         assertFalse(state.hasProblem)
         assertFalse(state.allUnavailable)
@@ -133,7 +149,8 @@ class DashboardAggregatorTest {
         assertEquals("connection refused", (plexTile.status as TileStatus.Unavailable).message)
 
         // The whole point: every other tile still carries real data.
-        listOf(DashboardTileKey.KOMODO, DashboardTileKey.UPTIME_KUMA, DashboardTileKey.SEERR, DashboardTileKey.GRAFANA).forEach { key ->
+        listOf(DashboardTileKey.KOMODO, DashboardTileKey.UPTIME_KUMA, DashboardTileKey.SEERR, DashboardTileKey.GRAFANA,
+            DashboardTileKey.HOME_ASSISTANT, DashboardTileKey.NEXTCLOUD, DashboardTileKey.TRANSMISSION).forEach { key ->
             assertTrue("$key should still be Ready", state.tiles.single { it.key == key }.status is TileStatus.Ready)
         }
         assertFalse(state.allUnavailable)
@@ -177,6 +194,40 @@ class DashboardAggregatorTest {
     }
 
     @Test
+    fun `errored torrents are danger, active ones are neutral`() = runTest {
+        happyPath()
+        coEvery { transmission.getSummary(any()) } returns
+            TransmissionSummary(activeTorrents = 4, erroredTorrents = 1, totalTorrents = 12)
+
+        val tiles = aggregator().load(0L).tiles
+
+        assertEquals(TileSeverity.NEUTRAL, metric(tiles, DashboardTileKey.TRANSMISSION, "Active").severity)
+        assertEquals(TileSeverity.DANGER, metric(tiles, DashboardTileKey.TRANSMISSION, "Errors").severity)
+    }
+
+    @Test
+    fun `nextcloud free space is reported in whole GB`() = runTest {
+        happyPath()
+        coEvery { nextcloud.getSummary(any()) } returns
+            NextcloudSummary(freeSpaceBytes = 3L * 1_073_741_824L, activeUsers24h = 0, numFiles = 1)
+
+        assertEquals(3, metric(aggregator().load(0L).tiles, DashboardTileKey.NEXTCLOUD, "Free GB").value)
+    }
+
+    @Test
+    fun `unavailable home assistant entities warn but do not alarm`() = runTest {
+        // A sleeping device or a rebooting hub is routine — real, but not worth colouring red.
+        happyPath()
+        coEvery { homeAssistant.getSummary(any()) } returns
+            HomeAssistantSummary(lightsOn = 0, unavailableEntities = 5, totalEntities = 300)
+
+        val state = aggregator().load(0L)
+
+        assertEquals(TileSeverity.WARNING, metric(state.tiles, DashboardTileKey.HOME_ASSISTANT, "Unavailable").severity)
+        assertFalse(state.hasProblem)
+    }
+
+    @Test
     fun `tile title prefers the instance label`() = runTest {
         happyPath()
         coEvery { serviceInstances.getPreferredInstance(ServiceType.KOMODO) } returns
@@ -194,6 +245,9 @@ class DashboardAggregatorTest {
         coEvery { plex.getSummary(any()) } throws boom
         coEvery { mediaArr.getSeerrSummary(any()) } throws boom
         coEvery { grafana.getSummary(any()) } throws boom
+        coEvery { homeAssistant.getSummary(any()) } throws boom
+        coEvery { nextcloud.getSummary(any()) } throws boom
+        coEvery { transmission.getSummary(any()) } throws boom
 
         val state = aggregator().load(0L)
 

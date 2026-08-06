@@ -41,6 +41,9 @@ enum class ServiceType(val displayName: String) {
     PTERODACTYL("Pterodactyl"),
     CALAGOPUS("Calagopus"),
     GRAFANA("Grafana"),
+    HOME_ASSISTANT("Home Assistant"),
+    NEXTCLOUD("Nextcloud"),
+    TRANSMISSION("Transmission"),
     UNKNOWN("Unknown");
 
     companion object {

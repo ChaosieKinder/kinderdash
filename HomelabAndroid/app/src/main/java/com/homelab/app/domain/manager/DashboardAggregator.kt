@@ -1,6 +1,9 @@
 package com.homelab.app.domain.manager
 
 import com.homelab.app.data.repository.GrafanaRepository
+import com.homelab.app.data.repository.HomeAssistantRepository
+import com.homelab.app.data.repository.NextcloudRepository
+import com.homelab.app.data.repository.TransmissionRepository
 import com.homelab.app.data.repository.KomodoRepository
 import com.homelab.app.data.repository.MediaArrRepository
 import com.homelab.app.data.repository.PlexRepository
@@ -46,7 +49,10 @@ class DashboardAggregator @Inject constructor(
     private val uptimeKuma: UptimeKumaRepository,
     private val plex: PlexRepository,
     private val mediaArr: MediaArrRepository,
-    private val grafana: GrafanaRepository
+    private val grafana: GrafanaRepository,
+    private val homeAssistant: HomeAssistantRepository,
+    private val nextcloud: NextcloudRepository,
+    private val transmission: TransmissionRepository
 ) {
 
     suspend fun load(nowMillis: Long): DashboardState = coroutineScope {
@@ -56,7 +62,10 @@ class DashboardAggregator @Inject constructor(
             async { uptimeKumaTile() },
             async { plexTile() },
             async { seerrTile() },
-            async { grafanaTile() }
+            async { grafanaTile() },
+            async { homeAssistantTile() },
+            async { nextcloudTile() },
+            async { transmissionTile() }
         ).map { it.await() }
 
         DashboardState(tiles = tiles, generatedAtMillis = nowMillis)
@@ -128,6 +137,44 @@ class DashboardAggregator @Inject constructor(
                     // A firing Grafana alert is something you configured to demand attention, so it
                     // gets the same weight as an unhealthy container rather than a softer warning.
                     severity = if (summary.firingAlerts > 0) TileSeverity.DANGER else TileSeverity.GOOD
+                )
+            )
+        }
+
+    private suspend fun homeAssistantTile(): DashboardTile =
+        tile(DashboardTileKey.HOME_ASSISTANT, ServiceType.HOME_ASSISTANT) { instanceId ->
+            val summary = homeAssistant.getSummary(instanceId)
+            listOf(
+                TileMetric("Lights on", summary.lightsOn, TileSeverity.NEUTRAL),
+                TileMetric(
+                    label = "Unavailable",
+                    value = summary.unavailableEntities,
+                    // An unavailable entity means an integration has stopped working — a real fault,
+                    // but a routine one (a device asleep, a hub rebooting), so warning not danger.
+                    severity = if (summary.unavailableEntities > 0) TileSeverity.WARNING else TileSeverity.GOOD
+                )
+            )
+        }
+
+    private suspend fun nextcloudTile(): DashboardTile =
+        tile(DashboardTileKey.NEXTCLOUD, ServiceType.NEXTCLOUD) { instanceId ->
+            val summary = nextcloud.getSummary(instanceId)
+            listOf(
+                // NEUTRAL deliberately: serverinfo reports free bytes but not the total, so there is
+                // no percentage to threshold against, and any absolute GB cutoff would be a guess.
+                TileMetric("Free GB", summary.freeSpaceGb, TileSeverity.NEUTRAL)
+            )
+        }
+
+    private suspend fun transmissionTile(): DashboardTile =
+        tile(DashboardTileKey.TRANSMISSION, ServiceType.TRANSMISSION) { instanceId ->
+            val summary = transmission.getSummary(instanceId)
+            listOf(
+                TileMetric("Active", summary.activeTorrents, TileSeverity.NEUTRAL),
+                TileMetric(
+                    label = "Errors",
+                    value = summary.erroredTorrents,
+                    severity = if (summary.erroredTorrents > 0) TileSeverity.DANGER else TileSeverity.GOOD
                 )
             )
         }

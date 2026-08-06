@@ -23,6 +23,9 @@ class SseClient @Inject constructor(
             .addHeader("X-Homelab-Instance-Id", instanceId)
             .addHeader("X-Homelab-Service", when(serviceType) {
                 ServiceType.GRAFANA -> "Grafana"
+                ServiceType.HOME_ASSISTANT -> "HomeAssistant"
+                ServiceType.NEXTCLOUD -> "Nextcloud"
+                ServiceType.TRANSMISSION -> "Transmission"
                 ServiceType.PORTAINER -> "Portainer"
                 ServiceType.PIHOLE -> "Pihole"
                 ServiceType.ADGUARD_HOME -> "AdGuardHome"

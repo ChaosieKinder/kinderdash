@@ -12,6 +12,9 @@ import com.homelab.app.data.repository.GiteaRepository
 import com.homelab.app.data.repository.LinuxUpdateRepository
 import com.homelab.app.data.repository.CraftyRepository
 import com.homelab.app.data.repository.GrafanaRepository
+import com.homelab.app.data.repository.HomeAssistantRepository
+import com.homelab.app.data.repository.NextcloudRepository
+import com.homelab.app.data.repository.TransmissionRepository
 import com.homelab.app.data.repository.HealthchecksRepository
 import com.homelab.app.data.repository.JellystatRepository
 import com.homelab.app.data.repository.KomodoRepository
@@ -70,6 +73,9 @@ class ServiceLoginViewModel @Inject constructor(
     private val nginxProxyManagerRepository: NginxProxyManagerRepository,
     private val healthchecksRepository: HealthchecksRepository,
     private val grafanaRepository: GrafanaRepository,
+    private val homeAssistantRepository: HomeAssistantRepository,
+    private val nextcloudRepository: NextcloudRepository,
+    private val transmissionRepository: TransmissionRepository,
     private val jellystatRepository: JellystatRepository,
     private val patchmonRepository: PatchmonRepository,
     private val pangolinRepository: PangolinRepository,
@@ -269,6 +275,40 @@ class ServiceLoginViewModel @Inject constructor(
                                 username = trimmedUsername,
                                 fallbackUrl = cleanFallbackUrl,
                                 password = authPassword
+                            )
+                        }
+                        ServiceType.HOME_ASSISTANT -> {
+                            require(trimmedApiKey.isNotBlank()) { context.getString(R.string.login_error_api_key_required) }
+                            homeAssistantRepository.authenticate(cleanUrl, trimmedApiKey, allowSelfSigned = allowSelfSigned)
+                            ServiceInstance(
+                                id = instanceId, type = serviceType, label = normalizedLabel,
+                                url = cleanUrl, token = trimmedApiKey,
+                                fallbackUrl = cleanFallbackUrl, allowSelfSigned = allowSelfSigned
+                            )
+                        }
+                        ServiceType.NEXTCLOUD -> {
+                            require(trimmedApiKey.isNotBlank()) { context.getString(R.string.login_error_api_key_required) }
+                            nextcloudRepository.authenticate(cleanUrl, trimmedApiKey, allowSelfSigned = allowSelfSigned)
+                            ServiceInstance(
+                                id = instanceId, type = serviceType, label = normalizedLabel,
+                                url = cleanUrl, token = trimmedApiKey,
+                                fallbackUrl = cleanFallbackUrl, allowSelfSigned = allowSelfSigned
+                            )
+                        }
+                        ServiceType.TRANSMISSION -> {
+                            // Credentials are optional — plenty of LAN instances run open.
+                            transmissionRepository.authenticate(
+                                cleanUrl,
+                                trimmedUsername.ifBlank { null },
+                                password.ifBlank { null },
+                                allowSelfSigned = allowSelfSigned
+                            )
+                            ServiceInstance(
+                                id = instanceId, type = serviceType, label = normalizedLabel,
+                                url = cleanUrl,
+                                username = trimmedUsername.ifBlank { null },
+                                password = password.ifBlank { null },
+                                fallbackUrl = cleanFallbackUrl, allowSelfSigned = allowSelfSigned
                             )
                         }
                         ServiceType.GRAFANA -> {

@@ -33,6 +33,9 @@ val ServiceType.primaryColor: Color
     @Composable
     get() = when (this) {
         ServiceType.GRAFANA -> Color(0xFFF46800)
+        ServiceType.HOME_ASSISTANT -> Color(0xFF41BDF5)
+        ServiceType.NEXTCLOUD -> Color(0xFF0082C9)
+        ServiceType.TRANSMISSION -> Color(0xFFD70008)
         ServiceType.PORTAINER -> Color(0xFF13B5EA)
         ServiceType.PIHOLE -> Color(0xFFCD2326)
         ServiceType.ADGUARD_HOME -> Color(0xFF34C759)
@@ -74,6 +77,9 @@ val ServiceType.backgroundColor: Color
     @Composable
     get() = when (this) {
         ServiceType.GRAFANA -> Color(0xFFF46800).copy(alpha = 0.12f)
+        ServiceType.HOME_ASSISTANT -> Color(0xFF41BDF5).copy(alpha = 0.12f)
+        ServiceType.NEXTCLOUD -> Color(0xFF0082C9).copy(alpha = 0.12f)
+        ServiceType.TRANSMISSION -> Color(0xFFD70008).copy(alpha = 0.12f)
         ServiceType.PORTAINER -> Color(0xFF13B5EA).copy(alpha = 0.12f)
         ServiceType.PIHOLE -> Color(0xFFCD2326).copy(alpha = 0.12f)
         ServiceType.ADGUARD_HOME -> Color(0xFF34C759).copy(alpha = 0.12f)
@@ -114,6 +120,9 @@ val ServiceType.backgroundColor: Color
 val ServiceType.iconUrl: String
     get() = when (this) {
         ServiceType.GRAFANA -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/grafana.png"
+        ServiceType.HOME_ASSISTANT -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/home-assistant.png"
+        ServiceType.NEXTCLOUD -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/nextcloud.png"
+        ServiceType.TRANSMISSION -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/transmission.png"
         ServiceType.PORTAINER -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/portainer.png"
         ServiceType.PIHOLE -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/pi-hole.png"
         ServiceType.ADGUARD_HOME -> "https://cdn.jsdelivr.net/gh/selfhst/icons/png/adguard-home.png"
@@ -218,6 +227,9 @@ val ServiceType.iconCandidates: List<String>
 val ServiceType.fallbackIcon: ImageVector
     get() = when (this) {
         ServiceType.GRAFANA -> Icons.Default.Insights
+        ServiceType.HOME_ASSISTANT -> Icons.Default.Hub
+        ServiceType.NEXTCLOUD -> Icons.Default.Storage
+        ServiceType.TRANSMISSION -> Icons.Default.Download
         ServiceType.PORTAINER -> Icons.Default.Widgets
         ServiceType.PIHOLE -> Icons.Default.Security
         ServiceType.ADGUARD_HOME -> Icons.Default.Security

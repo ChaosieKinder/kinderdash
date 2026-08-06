@@ -12,6 +12,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
@@ -76,8 +77,10 @@ class KinderDashWidget : GlanceAppWidget() {
 
     @androidx.compose.runtime.Composable
     private fun DashboardBody(state: DashboardState?) {
-        // Two columns whenever there is room; one only on a genuinely narrow phone page.
-        val twoColumn = LocalSize.current.width >= WIDE.width
+        // Two columns whenever there is room. Also forced once there are more than four tiles,
+        // because a single column of eight does not fit any of the target sizes.
+        val tiles = state?.let(::visibleTiles).orEmpty()
+        val twoColumn = LocalSize.current.width >= WIDE.width || tiles.size > 4
 
         Column(
             modifier = GlanceModifier
@@ -90,7 +93,7 @@ class KinderDashWidget : GlanceAppWidget() {
             Header(state)
             Spacer(GlanceModifier.size(10.dp))
 
-            if (state == null || state.tiles.isEmpty()) {
+            if (state == null || tiles.isEmpty()) {
                 Text(
                     text = "Tap to load",
                     style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
@@ -98,25 +101,27 @@ class KinderDashWidget : GlanceAppWidget() {
                 return@Column
             }
 
-            if (twoColumn) {
-                state.tiles.chunked(2).forEach { pair ->
-                    Row(modifier = GlanceModifier.fillMaxWidth()) {
-                        pair.forEachIndexed { index, tile ->
-                            TileCard(tile, GlanceModifier.defaultWeight())
-                            if (index == 0 && pair.size > 1) Spacer(GlanceModifier.size(8.dp))
-                        }
-                        // Keep a lone trailing tile at half width rather than letting it stretch.
-                        if (pair.size == 1) {
+            // LazyColumn, not Column: Glance's Column clips its overflow silently, so adding one
+            // service too many would just make a tile vanish. This scrolls instead.
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                val rows = if (twoColumn) tiles.chunked(2) else tiles.map { listOf(it) }
+                rows.forEach { row ->
+                    item {
+                        Column {
+                            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                                row.forEachIndexed { index, tile ->
+                                    TileCard(tile, GlanceModifier.defaultWeight())
+                                    if (index == 0 && row.size > 1) Spacer(GlanceModifier.size(8.dp))
+                                }
+                                // Keep a lone trailing tile at half width rather than stretched.
+                                if (twoColumn && row.size == 1) {
+                                    Spacer(GlanceModifier.size(8.dp))
+                                    Spacer(GlanceModifier.defaultWeight())
+                                }
+                            }
                             Spacer(GlanceModifier.size(8.dp))
-                            Spacer(GlanceModifier.defaultWeight())
                         }
                     }
-                    Spacer(GlanceModifier.size(8.dp))
-                }
-            } else {
-                state.tiles.forEach { tile ->
-                    TileCard(tile, GlanceModifier.fillMaxWidth())
-                    Spacer(GlanceModifier.size(8.dp))
                 }
             }
         }
@@ -236,6 +241,19 @@ private fun Int.sp() = androidx.compose.ui.unit.TextUnit(
     this.toFloat(),
     androidx.compose.ui.unit.TextUnitType.Sp
 )
+
+/**
+ * Which tiles are worth pixels.
+ *
+ * Services that aren't set up are dropped — with eight supported integrations and only a few
+ * configured, a widget mostly reading "Not set up" is noise that crowds out the numbers that
+ * matter. The exception is when NOTHING is configured: then the full list is the most useful
+ * thing to show, because it tells you what the app can do.
+ */
+internal fun visibleTiles(state: DashboardState): List<DashboardTile> {
+    val configured = state.tiles.filterNot { it.status is TileStatus.NotConfigured }
+    return configured.ifEmpty { state.tiles }
+}
 
 /** Coarse on purpose — a widget only needs to convey "is this stale?", not a precise duration. */
 internal fun relativeAge(generatedAtMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {

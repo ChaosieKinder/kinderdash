@@ -38,7 +38,10 @@ enum class DashboardTileKey {
     UPTIME_KUMA,
     PLEX,
     SEERR,
-    GRAFANA
+    GRAFANA,
+    HOME_ASSISTANT,
+    NEXTCLOUD,
+    TRANSMISSION
 }
 
 @Serializable

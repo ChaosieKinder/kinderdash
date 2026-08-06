@@ -393,6 +393,9 @@ fun ServiceSettingsSection(
 internal fun serviceDisplayNameForSettings(type: ServiceType): String {
     return when (type) {
         ServiceType.GRAFANA -> stringResource(R.string.service_grafana)
+        ServiceType.HOME_ASSISTANT -> stringResource(R.string.service_home_assistant)
+        ServiceType.NEXTCLOUD -> stringResource(R.string.service_nextcloud)
+        ServiceType.TRANSMISSION -> stringResource(R.string.service_transmission)
         ServiceType.PORTAINER -> stringResource(R.string.service_portainer)
         ServiceType.PIHOLE -> stringResource(R.string.service_pihole)
         ServiceType.ADGUARD_HOME -> stringResource(R.string.service_adguard_home)

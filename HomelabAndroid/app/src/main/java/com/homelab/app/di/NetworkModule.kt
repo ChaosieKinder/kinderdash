@@ -276,4 +276,22 @@ object NetworkModule {
     fun provideGrafanaApi(retrofit: Retrofit): com.homelab.app.data.remote.api.GrafanaApi {
         return retrofit.create(com.homelab.app.data.remote.api.GrafanaApi::class.java)
     }
+
+    @Provides
+    @Singleton
+    fun provideHomeAssistantApi(retrofit: Retrofit): com.homelab.app.data.remote.api.HomeAssistantApi {
+        return retrofit.create(com.homelab.app.data.remote.api.HomeAssistantApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNextcloudApi(retrofit: Retrofit): com.homelab.app.data.remote.api.NextcloudApi {
+        return retrofit.create(com.homelab.app.data.remote.api.NextcloudApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTransmissionApi(retrofit: Retrofit): com.homelab.app.data.remote.api.TransmissionApi {
+        return retrofit.create(com.homelab.app.data.remote.api.TransmissionApi::class.java)
+    }
 }
