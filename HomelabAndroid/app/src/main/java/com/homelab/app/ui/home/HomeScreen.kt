@@ -33,11 +33,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -94,7 +94,8 @@ import kotlinx.coroutines.isActive
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToService: (ServiceType, String) -> Unit,
-    onNavigateToLogin: (ServiceType, String?) -> Unit
+    onNavigateToLogin: (ServiceType, String?) -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val reachability by viewModel.reachability.collectAsStateWithLifecycle()
     val pinging by viewModel.pinging.collectAsStateWithLifecycle()
@@ -108,7 +109,6 @@ fun HomeScreen(
     val summaryLoadingIds by viewModel.summaryLoadingIds.collectAsStateWithLifecycle()
     val refreshingInstanceIds by viewModel.refreshingInstanceIds.collectAsStateWithLifecycle()
 
-    var showReorderDialog by rememberSaveable { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
@@ -205,10 +205,12 @@ fun HomeScreen(
                             )
                         }
 
-                        FilledTonalIconButton(onClick = { showReorderDialog = true }) {
+                        // Replaces the reorder shortcut. Reordering lives in Settings →
+                        // Configured services, alongside the visibility toggles it belongs with.
+                        FilledTonalIconButton(onClick = onNavigateToSettings) {
                             Icon(
-                                imageVector = Icons.Default.SwapVert,
-                                contentDescription = stringResource(R.string.home_reorder_services)
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.nav_settings)
                             )
                         }
                     }
@@ -261,16 +263,6 @@ fun HomeScreen(
         }
     }
 
-    if (showReorderDialog) {
-        ServiceOrderDialog(
-            serviceOrder = serviceOrder.filter { it.isHomeService },
-            hiddenServices = hiddenServices,
-            onMoveUp = { type -> viewModel.moveService(type, -1) },
-            onMoveDown = { type -> viewModel.moveService(type, 1) },
-            onToggleVisibility = { type -> viewModel.toggleServiceVisibility(type) },
-            onDismiss = { showReorderDialog = false }
-        )
-    }
 }
 
 
@@ -642,88 +634,4 @@ fun TailscaleCard(isConnected: Boolean) {
             }
         }
     }
-}
-
-
-@Composable
-private fun ServiceOrderDialog(
-    serviceOrder: List<ServiceType>,
-    hiddenServices: Set<String>,
-    onMoveUp: (ServiceType) -> Unit,
-    onMoveDown: (ServiceType) -> Unit,
-    onToggleVisibility: (ServiceType) -> Unit,
-    onDismiss: () -> Unit
-) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.home_reorder_services)) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                serviceOrder.forEachIndexed { index, type ->
-                    val isHidden = hiddenServices.contains(type.name)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = type.displayName,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (isHidden) {
-                                Text(
-                                    text = stringResource(R.string.settings_hidden_badge),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        IconButton(onClick = { onToggleVisibility(type) }) {
-                            Icon(
-                                imageVector = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = stringResource(
-                                    if (isHidden) R.string.settings_show_service_generic else R.string.settings_hide_service_generic
-                                )
-                            )
-                        }
-                        IconButton(
-                            onClick = { onMoveUp(type) },
-                            enabled = index > 0
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = stringResource(R.string.settings_move_up)
-                            )
-                        }
-                        IconButton(
-                            onClick = { onMoveDown(type) },
-                            enabled = index < serviceOrder.lastIndex
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = stringResource(R.string.settings_move_down)
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
-            }
-        }
-    )
 }

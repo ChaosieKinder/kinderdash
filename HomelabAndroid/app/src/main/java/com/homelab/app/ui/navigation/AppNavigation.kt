@@ -137,7 +137,9 @@ private fun loginRoute(type: ServiceType, instanceId: String? = null): String {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    val items = listOf(Screen.Home, Screen.Media, Screen.Bookmarks, Screen.Settings)
+    // Settings is deliberately not a tab: it's a rarely-used destination reached from the Home
+    // top bar. Screen.Settings still exists as a route — it just isn't in the bottom bar.
+    val items = listOf(Screen.Home, Screen.Media, Screen.Bookmarks)
     var configuredServicesUnlocked by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -180,12 +182,10 @@ fun AppNavigation() {
                                     if (currentDestination?.route == screen.route) return@clickable
 
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                    if (screen == Screen.Settings && isServiceChild) {
-                                        navController.navigate(screen.route) {
-                                            launchSingleTop = true
-                                        }
-                                    } else if (screen == Screen.Home && currentDestination?.route == Screen.Settings.route) {
-                                        // If Settings was opened from a service dashboard, return there instead of resetting to main Home.
+                                    if (screen == Screen.Home && currentDestination?.route == Screen.Settings.route) {
+                                        // Settings is now pushed onto the stack rather than being a
+                                        // sibling tab, so Home should pop back to wherever it was
+                                        // opened from instead of resetting.
                                         if (navController.popBackStack()) return@clickable
                                     } else {
                                         navController.navigate(screen.route) {
@@ -237,6 +237,9 @@ fun AppNavigation() {
                     },
                     onNavigateToLogin = { type, instanceId ->
                         navController.navigate(loginRoute(type, instanceId))
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                     }
                 )
             }
