@@ -59,7 +59,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onNavigateToLogin: (ServiceType, String?) -> Unit = { _, _ -> },
     onNavigateToDebugLogs: () -> Unit = {},
-    onNavigateToConfiguredServices: () -> Unit = {},
+    onNavigateToHomeServices: () -> Unit = {},
+    onNavigateToArrServices: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -173,6 +174,9 @@ fun SettingsScreen(
             val appVersion = BuildConfig.VERSION_NAME
 
             // --- CONFIGURED SERVICES ---
+            // Two entries straight to the group screens. There used to be a single card leading to
+            // a page whose only content was these two links; the hop is gone, and the PIN gate that
+            // page used to carry now lives on the group routes themselves.
             item {
                 Text(
                     text = stringResource(R.string.settings_configured_services_title),
@@ -182,77 +186,27 @@ fun SettingsScreen(
                     modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 8.dp)
                 )
 
-                Surface(
-                    onClick = onNavigateToConfiguredServices,
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 1.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Dns,
-                            contentDescription = stringResource(R.string.settings_configured_services_title),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.settings_configured_services_title),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(999.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
-                                ) {
-                                    Text(
-                                        text = "${stringResource(R.string.settings_group_home_title)} $homeConfiguredCount/$homeTotalCount",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(999.dp),
-                                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f)
-                                ) {
-                                    Text(
-                                        text = "ARR $arrConfiguredCount/$arrTotalCount",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                        if (isPinSet) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = stringResource(R.string.settings_configured_services_title),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ServiceGroupSettingsRow(
+                        title = stringResource(R.string.settings_group_home_title),
+                        subtitle = stringResource(R.string.settings_group_home_subtitle),
+                        icon = Icons.Default.Dns,
+                        tint = MaterialTheme.colorScheme.primary,
+                        configuredCount = homeConfiguredCount,
+                        totalCount = homeTotalCount,
+                        showLock = isPinSet,
+                        onClick = onNavigateToHomeServices
+                    )
+                    ServiceGroupSettingsRow(
+                        title = stringResource(R.string.settings_group_arr_title),
+                        subtitle = stringResource(R.string.settings_group_arr_subtitle),
+                        icon = Icons.Default.PlayArrow,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        configuredCount = arrConfiguredCount,
+                        totalCount = arrTotalCount,
+                        showLock = isPinSet,
+                        onClick = onNavigateToArrServices
+                    )
                 }
             }
 
@@ -981,6 +935,83 @@ private fun ContactChip(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false
+            )
+        }
+    }
+}
+
+/**
+ * One tappable group in the Configured Services section.
+ *
+ * Carries the lock glyph when a PIN is set — the gate now lives on the destination route rather
+ * than on an intermediate page, so this is the only remaining hint that the tap will challenge you.
+ */
+@Composable
+private fun ServiceGroupSettingsRow(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    configuredCount: Int,
+    totalCount: Int,
+    showLock: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = tint,
+                modifier = Modifier.size(24.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = tint.copy(alpha = 0.16f)
+            ) {
+                Text(
+                    text = "$configuredCount/$totalCount",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+            if (showLock) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

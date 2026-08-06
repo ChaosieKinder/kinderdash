@@ -50,6 +50,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.homelab.app.ui.settings.ConfiguredServicesGroup
 import com.homelab.app.R
 import com.homelab.app.ui.home.HomeScreen
 import com.homelab.app.ui.settings.SettingsScreen
@@ -267,8 +268,11 @@ fun AppNavigation() {
                     onNavigateToDebugLogs = {
                         navController.navigate("settings/debug-logs")
                     },
-                    onNavigateToConfiguredServices = {
-                        navController.navigate("settings/configured-services")
+                    onNavigateToHomeServices = {
+                        navController.navigate("settings/configured-services/${ConfiguredServicesGroup.HOME.name}")
+                    },
+                    onNavigateToArrServices = {
+                        navController.navigate("settings/configured-services/${ConfiguredServicesGroup.ARR.name}")
                     },
                     onNavigateToBackup = {
                         navController.navigate("settings/backup")
@@ -280,11 +284,24 @@ fun AppNavigation() {
                 DebugLogsScreen(onNavigateBack = { navController.popBackStack() })
             }
 
-            composable("settings/configured-services") {
+            composable(
+                route = "settings/configured-services/{group}",
+                arguments = listOf(androidx.navigation.navArgument("group") { type = NavType.StringType })
+            ) { backStackEntry ->
                 val settingsVm: com.homelab.app.ui.settings.SettingsViewModel = hiltViewModel()
+                val groupArg = backStackEntry.arguments?.getString("group")
+                val group = runCatching {
+                    com.homelab.app.ui.settings.ConfiguredServicesGroup.valueOf(groupArg.orEmpty())
+                }.getOrNull() ?: com.homelab.app.ui.settings.ConfiguredServicesGroup.HOME
+
                 val isPinSet by settingsVm.isPinSet.collectAsStateWithLifecycle()
                 val biometricEnabled by settingsVm.biometricEnabled.collectAsStateWithLifecycle()
 
+                // The gate lives here, on the screen that actually shows credentials, rather than
+                // on an intermediate page. Previously these routes were unguarded and relied on
+                // being reachable only THROUGH the gated parent — a navigation convention doing a
+                // security job, which would have silently stopped applying the moment anything
+                // linked straight to a group.
                 if (isPinSet && !configuredServicesUnlocked) {
                     LockScreen(
                         biometricEnabled = biometricEnabled,
@@ -297,31 +314,10 @@ fun AppNavigation() {
                         onNavigateToLogin = { type, instanceId ->
                             navController.navigate(loginRoute(type, instanceId))
                         },
-                        onNavigateToGroup = { group ->
-                            navController.navigate("settings/configured-services/${group.name}")
-                        },
+                        group = group,
                         viewModel = settingsVm
                     )
                 }
-            }
-
-            composable(
-                route = "settings/configured-services/{group}",
-                arguments = listOf(androidx.navigation.navArgument("group") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val settingsVm: com.homelab.app.ui.settings.SettingsViewModel = hiltViewModel()
-                val groupArg = backStackEntry.arguments?.getString("group")
-                val group = runCatching {
-                    com.homelab.app.ui.settings.ConfiguredServicesGroup.valueOf(groupArg.orEmpty())
-                }.getOrNull() ?: com.homelab.app.ui.settings.ConfiguredServicesGroup.HOME
-                ConfiguredServicesScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToLogin = { type, instanceId ->
-                        navController.navigate(loginRoute(type, instanceId))
-                    },
-                    group = group,
-                    viewModel = settingsVm
-                )
             }
 
             composable("settings/backup") {

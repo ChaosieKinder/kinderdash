@@ -36,8 +36,7 @@ enum class ConfiguredServicesGroup {
 fun ConfiguredServicesScreen(
     onNavigateBack: () -> Unit,
     onNavigateToLogin: (ServiceType, String?) -> Unit,
-    onNavigateToGroup: (ConfiguredServicesGroup) -> Unit = {},
-    group: ConfiguredServicesGroup? = null,
+    group: ConfiguredServicesGroup,
     viewModel: SettingsViewModel
 ) {
     val instancesByType by viewModel.instancesByType.collectAsStateWithLifecycle()
@@ -48,7 +47,6 @@ fun ConfiguredServicesScreen(
     val groupedServices = when (group) {
         ConfiguredServicesGroup.HOME -> serviceOrder.filter { it.isHomeService }
         ConfiguredServicesGroup.ARR -> serviceOrder.filter { it.isArrStack }
-        null -> emptyList()
     }
 
     // Hidden services are removed from the list outright rather than rendered as full-height cards
@@ -65,7 +63,6 @@ fun ConfiguredServicesScreen(
                         when (group) {
                             ConfiguredServicesGroup.HOME -> stringResource(R.string.settings_group_home_title)
                             ConfiguredServicesGroup.ARR -> stringResource(R.string.settings_group_arr_title)
-                            null -> stringResource(R.string.settings_configured_services_title)
                         }
                     )
                 },
@@ -75,7 +72,7 @@ fun ConfiguredServicesScreen(
                     }
                 },
                 actions = {
-                    if (group != null && hiddenInGroup.isNotEmpty()) {
+                    if (hiddenInGroup.isNotEmpty()) {
                         IconButton(onClick = { showRestoreSheet = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -97,54 +94,27 @@ fun ConfiguredServicesScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (group == null) {
-                item {
-                    ServiceGroupCard(
-                        title = stringResource(R.string.settings_group_home_title),
-                        subtitle = stringResource(R.string.settings_group_home_subtitle),
-                        icon = Icons.Default.Home,
-                        tint = MaterialTheme.colorScheme.primary,
-                        configuredCount = serviceOrder.count { it.isHomeService && instancesByType[it].orEmpty().isNotEmpty() },
-                        totalCount = serviceOrder.count { it.isHomeService },
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onNavigateToGroup(ConfiguredServicesGroup.HOME) }
-                    )
-                }
-                item {
-                    ServiceGroupCard(
-                        title = stringResource(R.string.settings_group_arr_title),
-                        subtitle = stringResource(R.string.settings_group_arr_subtitle),
-                        icon = Icons.Default.PlayArrow,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        configuredCount = serviceOrder.count { it.isArrStack && instancesByType[it].orEmpty().isNotEmpty() },
-                        totalCount = serviceOrder.count { it.isArrStack },
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onNavigateToGroup(ConfiguredServicesGroup.ARR) }
-                    )
-                }
-            } else {
-                items(visibleServices, key = { it.name }) { type ->
-                    // Position within the VISIBLE list, so the arrows disable at the ends of what
-                    // is actually on screen rather than at the ends of the global order.
-                    val index = visibleServices.indexOf(type)
-                    ServiceSettingsSection(
-                        type = type,
-                        instances = instancesByType[type].orEmpty(),
-                        preferredInstanceId = preferredInstanceIdByType[type],
-                        isHidden = false,
-                        canMoveUp = index > 0,
-                        canMoveDown = index in 0 until visibleServices.lastIndex,
-                        onToggleVisibility = { viewModel.toggleServiceVisibility(type) },
-                        // Scoped to the visible set: a global one-place move could swap with a
-                        // hidden neighbour and look like nothing happened.
-                        onMoveUp = { viewModel.moveServiceWithin(type, -1, visibleServices.toSet()) },
-                        onMoveDown = { viewModel.moveServiceWithin(type, 1, visibleServices.toSet()) },
-                        onAdd = { onNavigateToLogin(type, null) },
-                        onEdit = { instance -> onNavigateToLogin(type, instance.id) },
-                        onDelete = { instance -> viewModel.deleteInstance(instance.id) },
-                        onSetDefault = { instance -> viewModel.setPreferredInstance(type, instance.id) }
-                    )
-                }
+            items(visibleServices, key = { it.name }) { type ->
+                // Position within the VISIBLE list, so the arrows disable at the ends of what
+                // is actually on screen rather than at the ends of the global order.
+                val index = visibleServices.indexOf(type)
+                ServiceSettingsSection(
+                    type = type,
+                    instances = instancesByType[type].orEmpty(),
+                    preferredInstanceId = preferredInstanceIdByType[type],
+                    isHidden = false,
+                    canMoveUp = index > 0,
+                    canMoveDown = index in 0 until visibleServices.lastIndex,
+                    onToggleVisibility = { viewModel.toggleServiceVisibility(type) },
+                    // Scoped to the visible set: a global one-place move could swap with a
+                    // hidden neighbour and look like nothing happened.
+                    onMoveUp = { viewModel.moveServiceWithin(type, -1, visibleServices.toSet()) },
+                    onMoveDown = { viewModel.moveServiceWithin(type, 1, visibleServices.toSet()) },
+                    onAdd = { onNavigateToLogin(type, null) },
+                    onEdit = { instance -> onNavigateToLogin(type, instance.id) },
+                    onDelete = { instance -> viewModel.deleteInstance(instance.id) },
+                    onSetDefault = { instance -> viewModel.setPreferredInstance(type, instance.id) }
+                )
             }
         }
     }
@@ -225,66 +195,6 @@ private fun RestoreHiddenServicesDialog(
             }
         }
     )
-}
-
-@Composable
-private fun ServiceGroupCard(
-    title: String,
-    subtitle: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: androidx.compose.ui.graphics.Color,
-    configuredCount: Int,
-    totalCount: Int,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = tint.copy(alpha = 0.15f),
-                modifier = Modifier.size(42.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = tint)
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "$configuredCount / $totalCount",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
 }
 
 @Composable
