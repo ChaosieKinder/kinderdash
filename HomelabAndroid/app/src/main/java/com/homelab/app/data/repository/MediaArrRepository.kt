@@ -153,6 +153,15 @@ data class MediaArrCardPreview(
     val metrics: List<MediaArrCardPreviewMetric>
 )
 
+/**
+ * The cheap, typed slice of Seerr the widget needs — mirroring the `getSummary()` convention on
+ * KomodoRepository, UptimeKumaRepository and PlexRepository. See [MediaArrRepository.getSeerrSummary].
+ */
+data class SeerrSummary(
+    val pendingRequests: Int,
+    val totalRequests: Int
+)
+
 enum class MediaArrSearchRequestTarget {
     RADARR_MOVIE,
     SONARR_SERIES,
@@ -349,6 +358,50 @@ class MediaArrRepository @Inject constructor(
             ServiceType.FLARESOLVERR -> flaresolverrCardPreview(instance)
             else -> throw IllegalStateException("Unsupported media service: ${instance.type.displayName}")
         }
+    }
+
+    /**
+     * Request counts for the home-screen widget, typed and accurate.
+     *
+     * Deliberately not built on [loadCardPreview], for two reasons:
+     *
+     *  1. Its metrics are `List<label, value>` strings aimed at card rendering. Matching on the
+     *     label "Pending" to get a number the widget makes colour decisions from is the kind of
+     *     coupling that breaks silently when someone edits a caption.
+     *  2. **It is not accurate.** That path fetches `take=20` and counts pending rows client-side,
+     *     so any backlog past twenty under-reports without any indication that it has.
+     *
+     * Here the server does the counting: `filter=pending` with `take=1` returns the full count in
+     * `pageInfo.results` while transferring a single row. Cheaper *and* correct.
+     *
+     * (Jellyseerr has since rebranded to Seerr; [ServiceType.JELLYSEERR] keeps the old name.)
+     */
+    suspend fun getSeerrSummary(instanceId: String): SeerrSummary = withContext(Dispatchers.IO) {
+        val instance = serviceInstancesRepository.getInstance(instanceId)
+            ?: throw IllegalStateException("Service instance not found")
+
+        val pending = requestInstance(instance, "/api/v1/request?take=1&skip=0&filter=pending")
+            .asJsonObject ?: JSONObject()
+        val all = requestInstance(instance, "/api/v1/request?take=1&skip=0&filter=all")
+            .asJsonObject ?: JSONObject()
+
+        SeerrSummary(
+            pendingRequests = pending.totalResultCount(),
+            totalRequests = all.totalResultCount()
+        )
+    }
+
+    /**
+     * Total result count for a paged Seerr response. Prefers `pageInfo.results` (the shape modern
+     * Seerr returns), falling back to the flatter keys the existing card-preview code expects so
+     * this keeps working if the server is older than assumed.
+     */
+    private fun JSONObject.totalResultCount(): Int {
+        optJSONObject("pageInfo")?.let { info ->
+            val fromPageInfo = info.optInt("results", -1)
+            if (fromPageInfo >= 0) return fromPageInfo
+        }
+        return optInt("totalResults", optInt("total", optJSONArray("results")?.length() ?: 0))
     }
 
     suspend fun searchContent(instanceId: String, query: String): List<MediaArrSearchResultItem> = withContext(Dispatchers.IO) {

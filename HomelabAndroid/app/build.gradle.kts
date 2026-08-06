@@ -66,6 +66,16 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Stubbed android.* methods throw by default, so any JVM test touching a code path that
+            // logs dies with "Method w in android.util.Log not mocked" — which fails the test for a
+            // reason unrelated to what it is asserting. Returning defaults instead lets us cover
+            // error paths, which are exactly the paths that log.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
