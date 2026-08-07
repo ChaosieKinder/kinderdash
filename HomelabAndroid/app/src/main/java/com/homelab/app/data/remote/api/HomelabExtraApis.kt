@@ -28,8 +28,9 @@ interface NextcloudApi {
     suspend fun getServerInfo(
         @Header("X-Homelab-Service") service: String = "Nextcloud",
         @Header("X-Homelab-Instance-Id") instanceId: String,
-        // Required on every OCS call; without it Nextcloud returns a login page instead of JSON.
-        @Header("OCS-APIRequest") ocsApiRequest: String = "true",
+        // OCS-APIRequest is required on every OCS call — without it Nextcloud returns a login page
+        // instead of JSON — but AuthInterceptor sets it, so declaring it here too would send it
+        // twice and leave two places to keep in sync.
         @Header("Accept") accept: String = "application/json",
         @Query("format") format: String = "json"
     ): NextcloudInfoResponse

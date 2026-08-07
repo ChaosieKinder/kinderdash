@@ -342,9 +342,11 @@ class AuthInterceptor @Inject constructor(
                 // serverinfo uses its own header, not Authorization. OCS-APIRequest is mandatory —
                 // without it Nextcloud answers with a login page instead of JSON.
                 if (instance.token.isNotBlank()) {
-                    builder.addHeader("NC-Token", instance.token)
+                    // header(), not addHeader(): addHeader appends, so anything that already set
+                    // these would end up sending them twice.
+                    builder.header("NC-Token", instance.token)
                 }
-                builder.addHeader("OCS-APIRequest", "true")
+                builder.header("OCS-APIRequest", "true")
             }
             ServiceType.TRANSMISSION -> {
                 // Optional: many LAN instances run without auth. The session-id handshake is
