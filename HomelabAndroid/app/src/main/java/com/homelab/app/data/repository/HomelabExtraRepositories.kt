@@ -90,7 +90,7 @@ class NextcloudRepository @Inject constructor(
                 if (!response.isSuccessful) {
                     throw IllegalStateException(
                         when (response.code) {
-                            401, 403 -> "Nextcloud rejected the token. Check the serverinfo token in Settings → Monitoring."
+                            401, 403 -> "Nextcloud rejected the token. This is the serverinfo token from Settings → Administration → System, not a password or app password."
                             404 -> "serverinfo endpoint not found — is the Server Info app enabled?"
                             else -> "Nextcloud returned HTTP ${response.code}."
                         }
