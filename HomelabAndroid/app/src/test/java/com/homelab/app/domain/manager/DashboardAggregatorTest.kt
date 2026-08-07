@@ -74,7 +74,8 @@ class DashboardAggregatorTest {
         coEvery { mediaArr.getSeerrSummary(any()) } returns SeerrSummary(pendingRequests = 0, totalRequests = 40)
         coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 3)
         coEvery { homeAssistant.getSummary(any()) } returns HomeAssistantSummary(lightsOn = 2, unavailableEntities = 0, totalEntities = 300)
-        coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000)
+        coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000,
+            memTotalKb = 16_000_000L, memFreeKb = 8_000_000L)
         coEvery { transmission.getSummary(any()) } returns TransmissionSummary(activeTorrents = 3, erroredTorrents = 0, totalTorrents = 10)
         coEvery { mediaArr.getCalendar(any(), any(), any()) } returns emptyList()
     }
@@ -102,21 +103,10 @@ class DashboardAggregatorTest {
 
         val state = aggregator().load(nowMillis = 1_000L)
 
-        assertEquals(9, state.tiles.size)
+        assertEquals(6, state.tiles.size)
         assertEquals(1_000L, state.generatedAtMillis)
         assertFalse(state.hasProblem)
         assertFalse(state.allUnavailable)
-    }
-
-    @Test
-    fun `unhealthy containers are danger, stopped are only warning`() = runTest {
-        happyPath()
-        coEvery { komodo.getDashboard(any()) } returns komodoDashboard(stopped = 2, unhealthy = 1)
-
-        val tiles = aggregator().load(0L).tiles
-
-        assertEquals(TileSeverity.WARNING, metric(tiles, DashboardTileKey.KOMODO, "Stopped").severity)
-        assertEquals(TileSeverity.DANGER, metric(tiles, DashboardTileKey.KOMODO, "Unhealthy").severity)
     }
 
     @Test
@@ -151,8 +141,8 @@ class DashboardAggregatorTest {
         assertEquals("connection refused", (plexTile.status as TileStatus.Unavailable).message)
 
         // The whole point: every other tile still carries real data.
-        listOf(DashboardTileKey.KOMODO, DashboardTileKey.UPTIME_KUMA, DashboardTileKey.SEERR, DashboardTileKey.GRAFANA,
-            DashboardTileKey.HOME_ASSISTANT, DashboardTileKey.NEXTCLOUD, DashboardTileKey.TRANSMISSION).forEach { key ->
+        listOf(DashboardTileKey.UPTIME_KUMA, DashboardTileKey.HOME_ASSISTANT,
+            DashboardTileKey.NEXTCLOUD, DashboardTileKey.TRANSMISSION).forEach { key ->
             assertTrue("$key should still be Ready", state.tiles.single { it.key == key }.status is TileStatus.Ready)
         }
         assertFalse(state.allUnavailable)
@@ -161,38 +151,12 @@ class DashboardAggregatorTest {
     @Test
     fun `service with no instance is NotConfigured, not an error`() = runTest {
         happyPath()
-        coEvery { serviceInstances.getPreferredInstance(ServiceType.JELLYSEERR) } returns null
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.PLEX) } returns null
 
-        val seerr = aggregator().load(0L).tiles.single { it.key == DashboardTileKey.SEERR }
+        val plex = aggregator().load(0L).tiles.single { it.key == DashboardTileKey.PLEX }
 
-        assertEquals(TileStatus.NotConfigured, seerr.status)
-        assertEquals(ServiceType.JELLYSEERR.displayName, seerr.title)
-    }
-
-    @Test
-    fun `firing grafana alerts are danger`() = runTest {
-        happyPath()
-        coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 2, totalAlerts = 5)
-
-        val firing = metric(aggregator().load(0L).tiles, DashboardTileKey.GRAFANA, "Firing")
-
-        assertEquals(2, firing.value)
-        assertEquals(TileSeverity.DANGER, firing.severity)
-        assertTrue(aggregator().load(0L).hasProblem)
-    }
-
-    @Test
-    fun `silenced grafana alerts are not counted as firing`() = runTest {
-        // GrafanaAlert.isFiring only counts state == "active"; silencing an alert is an explicit
-        // statement that you do not want to be told about it, so the widget must respect that.
-        happyPath()
-        coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 4)
-
-        val firing = metric(aggregator().load(0L).tiles, DashboardTileKey.GRAFANA, "Firing")
-
-        assertEquals(0, firing.value)
-        assertEquals(TileSeverity.GOOD, firing.severity)
-        assertFalse(aggregator().load(0L).hasProblem)
+        assertEquals(TileStatus.NotConfigured, plex.status)
+        assertEquals(ServiceType.PLEX.displayName, plex.title)
     }
 
     @Test
@@ -208,12 +172,27 @@ class DashboardAggregatorTest {
     }
 
     @Test
+    fun `nextcloud omits the memory bar when totals are not reported`() = runTest {
+        // memTotalKb = 0 means the instance reported nothing to divide by; a bar would be invented.
+        happyPath()
+        coEvery { nextcloud.getSummary(any()) } returns
+            NextcloudSummary(freeSpaceBytes = 1L, activeUsers24h = 0, numFiles = 1, memTotalKb = 0L, memFreeKb = 0L)
+
+        val metrics = (aggregator().load(0L).tiles.single { it.key == DashboardTileKey.NEXTCLOUD }
+            .status as TileStatus.Ready).metrics
+
+        assertEquals(emptyList<String>(), metrics.filter { it.label == "Memory" }.map { it.label })
+        assertEquals(null, metrics.single { it.label == "Free" }.percent)
+    }
+
+    @Test
     fun `nextcloud free space is reported in whole GB`() = runTest {
         happyPath()
         coEvery { nextcloud.getSummary(any()) } returns
-            NextcloudSummary(freeSpaceBytes = 3L * 1_073_741_824L, activeUsers24h = 0, numFiles = 1)
+            NextcloudSummary(freeSpaceBytes = 3L * 1_073_741_824L, activeUsers24h = 0, numFiles = 1,
+                memTotalKb = 0L, memFreeKb = 0L)
 
-        assertEquals(3, metric(aggregator().load(0L).tiles, DashboardTileKey.NEXTCLOUD, "Free GB").value)
+        assertEquals(3, metric(aggregator().load(0L).tiles, DashboardTileKey.NEXTCLOUD, "Free").value)
     }
 
     @Test
@@ -232,17 +211,16 @@ class DashboardAggregatorTest {
     @Test
     fun `tile title prefers the instance label`() = runTest {
         happyPath()
-        coEvery { serviceInstances.getPreferredInstance(ServiceType.KOMODO) } returns
-            instance(ServiceType.KOMODO, label = "Home Komodo")
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.PLEX) } returns
+            instance(ServiceType.PLEX, label = "Basement Plex")
 
-        assertEquals("Home Komodo", aggregator().load(0L).tiles.single { it.key == DashboardTileKey.KOMODO }.title)
+        assertEquals("Basement Plex", aggregator().load(0L).tiles.single { it.key == DashboardTileKey.PLEX }.title)
     }
 
     @Test
     fun `everything down is reported as allUnavailable`() = runTest {
         happyPath()
         val boom = IllegalStateException("no route to host")
-        coEvery { komodo.getDashboard(any()) } throws boom
         coEvery { uptimeKuma.getSummary(any()) } throws boom
         coEvery { plex.getSummary(any()) } throws boom
         coEvery { mediaArr.getSeerrSummary(any()) } throws boom

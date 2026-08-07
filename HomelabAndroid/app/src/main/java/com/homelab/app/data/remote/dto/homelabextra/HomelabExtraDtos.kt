@@ -47,8 +47,14 @@ data class NextcloudSection(
 
 @Serializable
 data class NextcloudSystem(
-    /** Free bytes on the data directory. serverinfo does not report the total, so no percentage. */
-    val freespace: Long? = null
+    /**
+     * Free bytes on the data directory. serverinfo reports no matching total, so this can only ever
+     * be shown as an absolute figure — there is no denominator to make a percentage from.
+     */
+    val freespace: Long? = null,
+    /** Memory totals ARE reported, which is why the bar on the tile is RAM and not disk. */
+    @SerialName("mem_total") val memTotal: Long? = null,
+    @SerialName("mem_free") val memFree: Long? = null
 )
 
 @Serializable

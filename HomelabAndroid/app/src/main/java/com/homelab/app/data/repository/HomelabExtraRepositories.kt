@@ -63,9 +63,16 @@ class HomeAssistantRepository @Inject constructor(
 data class NextcloudSummary(
     val freeSpaceBytes: Long,
     val activeUsers24h: Int,
-    val numFiles: Long
+    val numFiles: Long,
+    val memTotalKb: Long,
+    val memFreeKb: Long
 ) {
     val freeSpaceGb: Int get() = (freeSpaceBytes / 1_073_741_824L).toInt()
+
+    /** Memory in use as 0..100, or null when the instance doesn't report totals. */
+    val memoryUsedPercent: Int?
+        get() = if (memTotalKb > 0) (((memTotalKb - memFreeKb).toDouble() / memTotalKb) * 100)
+            .toInt().coerceIn(0, 100) else null
 }
 
 @Singleton
@@ -105,7 +112,9 @@ class NextcloudRepository @Inject constructor(
         return NextcloudSummary(
             freeSpaceBytes = data?.nextcloud?.system?.freespace ?: 0L,
             activeUsers24h = data?.activeUsers?.last24hours ?: 0,
-            numFiles = data?.nextcloud?.storage?.numFiles ?: 0L
+            numFiles = data?.nextcloud?.storage?.numFiles ?: 0L,
+            memTotalKb = data?.nextcloud?.system?.memTotal ?: 0L,
+            memFreeKb = data?.nextcloud?.system?.memFree ?: 0L
         )
     }
 }

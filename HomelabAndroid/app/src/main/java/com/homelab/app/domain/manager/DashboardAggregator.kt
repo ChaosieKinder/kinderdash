@@ -62,11 +62,8 @@ class DashboardAggregator @Inject constructor(
         val tiles = listOf(
             // Calendar first: it's the tallest tile and the one most worth landing on.
             async { calendarTile() },
-            async { komodoTile() },
             async { uptimeKumaTile() },
             async { plexTile() },
-            async { seerrTile() },
-            async { grafanaTile() },
             async { homeAssistantTile() },
             async { nextcloudTile() },
             async { transmissionTile() }
@@ -105,6 +102,14 @@ class DashboardAggregator @Inject constructor(
                     label = "Down",
                     value = down,
                     severity = if (down > 0) TileSeverity.DANGER else TileSeverity.GOOD
+                ),
+                TileMetric(
+                    label = "Monitors up",
+                    value = summary.upCount,
+                    severity = TileSeverity.NEUTRAL,
+                    percent = if (summary.totalCount > 0)
+                        (summary.upCount * 100) / summary.totalCount else null,
+                    suffix = "/${summary.totalCount}"
                 )
             )
         }
@@ -114,6 +119,7 @@ class DashboardAggregator @Inject constructor(
             val summary = plex.getSummary(instanceId)
             listOf(
                 TileMetric("Streams", summary.activeStreams, TileSeverity.NEUTRAL),
+                TileMetric("Playing", summary.playingStreams, TileSeverity.NEUTRAL),
                 TileMetric("Transcoding", summary.transcodingStreams, TileSeverity.NEUTRAL)
             )
         }
@@ -150,6 +156,7 @@ class DashboardAggregator @Inject constructor(
             val summary = homeAssistant.getSummary(instanceId)
             listOf(
                 TileMetric("Lights on", summary.lightsOn, TileSeverity.NEUTRAL),
+                TileMetric("Entities", summary.totalEntities, TileSeverity.NEUTRAL),
                 TileMetric(
                     label = "Unavailable",
                     value = summary.unavailableEntities,
@@ -163,11 +170,27 @@ class DashboardAggregator @Inject constructor(
     private suspend fun nextcloudTile(): DashboardTile =
         tile(DashboardTileKey.NEXTCLOUD, ServiceType.NEXTCLOUD) { instanceId ->
             val summary = nextcloud.getSummary(instanceId)
-            listOf(
-                // NEUTRAL deliberately: serverinfo reports free bytes but not the total, so there is
-                // no percentage to threshold against, and any absolute GB cutoff would be a guess.
-                TileMetric("Free GB", summary.freeSpaceGb, TileSeverity.NEUTRAL)
-            )
+            buildList {
+                // Text, not a bar: serverinfo reports free bytes with no matching total, so there
+                // is nothing to divide by and any absolute GB threshold would be invented.
+                add(TileMetric("Free", summary.freeSpaceGb, TileSeverity.NEUTRAL, suffix = "GB"))
+                add(TileMetric("Files", summary.numFiles.toInt(), TileSeverity.NEUTRAL))
+                summary.memoryUsedPercent?.let { used ->
+                    add(
+                        TileMetric(
+                            label = "Memory",
+                            value = used,
+                            severity = when {
+                                used >= 90 -> TileSeverity.DANGER
+                                used >= 75 -> TileSeverity.WARNING
+                                else -> TileSeverity.GOOD
+                            },
+                            percent = used,
+                            suffix = "%"
+                        )
+                    )
+                }
+            }
         }
 
     private suspend fun transmissionTile(): DashboardTile =
@@ -175,6 +198,7 @@ class DashboardAggregator @Inject constructor(
             val summary = transmission.getSummary(instanceId)
             listOf(
                 TileMetric("Active", summary.activeTorrents, TileSeverity.NEUTRAL),
+                TileMetric("Torrents", summary.totalTorrents, TileSeverity.NEUTRAL),
                 TileMetric(
                     label = "Errors",
                     value = summary.erroredTorrents,

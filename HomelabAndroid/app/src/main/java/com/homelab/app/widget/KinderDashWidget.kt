@@ -12,6 +12,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -107,7 +108,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 ) {
                     Text(
                         text = "Tap to load",
-                        style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
+                        style = TextStyle(color = ColorProvider(Muted), fontSize = 16.sp())
                     )
                 }
                 return@Column
@@ -153,7 +154,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 text = title,
                 style = TextStyle(
                     color = ColorProvider(Foreground),
-                    fontSize = 16.sp(),
+                    fontSize = 18.sp(),
                     fontWeight = FontWeight.Bold
                 ),
                 // Pushes the timestamp to the far edge.
@@ -161,7 +162,7 @@ class KinderDashWidget : GlanceAppWidget() {
             )
             Text(
                 text = state?.let { relativeAge(it.generatedAtMillis) } ?: "never",
-                style = TextStyle(color = ColorProvider(Muted), fontSize = 12.sp())
+                style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
             )
         }
     }
@@ -179,7 +180,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 maxLines = 1,
                 style = TextStyle(
                     color = ColorProvider(Muted),
-                    fontSize = 12.sp(),
+                    fontSize = 14.sp(),
                     fontWeight = FontWeight.Medium
                 )
             )
@@ -191,13 +192,13 @@ class KinderDashWidget : GlanceAppWidget() {
                 // Not an error — it just isn't set up. Say so quietly.
                 is TileStatus.NotConfigured -> Text(
                     text = "Not set up",
-                    style = TextStyle(color = ColorProvider(Muted), fontSize = 13.sp())
+                    style = TextStyle(color = ColorProvider(Muted), fontSize = 15.sp())
                 )
                 // Deliberately not red: unreachable is usually "phone is off the network", and
                 // colouring that as danger trains the eye to ignore real danger.
                 is TileStatus.Unavailable -> Text(
                     text = "Unavailable",
-                    style = TextStyle(color = ColorProvider(Muted), fontSize = 13.sp())
+                    style = TextStyle(color = ColorProvider(Muted), fontSize = 15.sp())
                 )
             }
         }
@@ -221,7 +222,7 @@ class KinderDashWidget : GlanceAppWidget() {
                     style = TextStyle(
                         // The only marker for today, now that the label is a plain weekday name.
                         color = ColorProvider(if (day.isToday) Foreground else Muted),
-                        fontSize = 12.sp(),
+                        fontSize = 14.sp(),
                         fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
                     ),
                     modifier = GlanceModifier.width(38.dp)
@@ -231,7 +232,7 @@ class KinderDashWidget : GlanceAppWidget() {
                     if (day.entries.isEmpty()) {
                         Text(
                             text = "–",
-                            style = TextStyle(color = ColorProvider(Muted), fontSize = 12.sp())
+                            style = TextStyle(color = ColorProvider(Muted), fontSize = 14.sp())
                         )
                     } else {
                         day.entries.take(MAX_SERIES_PER_DAY).forEach { entry ->
@@ -241,7 +242,7 @@ class KinderDashWidget : GlanceAppWidget() {
                         if (hidden > 0) {
                             Text(
                                 text = "+$hidden more",
-                                style = TextStyle(color = ColorProvider(Muted), fontSize = 11.sp())
+                                style = TextStyle(color = ColorProvider(Muted), fontSize = 13.sp())
                             )
                         }
                     }
@@ -260,7 +261,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 text = if (entry.episodeCount > 1) "${entry.seriesTitle} ×${entry.episodeCount}"
                        else entry.seriesTitle,
                 maxLines = 1,
-                style = TextStyle(color = ColorProvider(Foreground), fontSize = 12.sp()),
+                style = TextStyle(color = ColorProvider(Foreground), fontSize = 14.sp()),
                 modifier = GlanceModifier.defaultWeight()
             )
             Text(
@@ -273,7 +274,7 @@ class KinderDashWidget : GlanceAppWidget() {
                 },
                 style = TextStyle(
                     color = ColorProvider(if (entry.allDownloaded) Good else Warning),
-                    fontSize = 12.sp(),
+                    fontSize = 14.sp(),
                     fontWeight = FontWeight.Bold
                 )
             )
@@ -282,23 +283,36 @@ class KinderDashWidget : GlanceAppWidget() {
 
     @androidx.compose.runtime.Composable
     private fun MetricRow(metric: TileMetric) {
-        Row(
-            modifier = GlanceModifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = metric.label,
-                style = TextStyle(color = ColorProvider(Muted), fontSize = 13.sp()),
-                modifier = GlanceModifier.defaultWeight()
-            )
-            Text(
-                text = metric.value.toString(),
-                style = TextStyle(
-                    color = ColorProvider(colorFor(metric.severity)),
-                    fontSize = 20.sp(),
-                    fontWeight = FontWeight.Bold
+        Column(modifier = GlanceModifier.fillMaxWidth()) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = metric.label,
+                    style = TextStyle(color = ColorProvider(Muted), fontSize = 15.sp()),
+                    modifier = GlanceModifier.defaultWeight()
                 )
-            )
+                Text(
+                    text = metric.value.toString() + (metric.suffix ?: ""),
+                    style = TextStyle(
+                        color = ColorProvider(colorFor(metric.severity)),
+                        fontSize = 22.sp(),
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            // Only where there is a real denominator. A bar implies "out of something", so drawing
+            // one for a bare figure would invent a scale that doesn't exist.
+            metric.percent?.let { pct ->
+                Spacer(GlanceModifier.size(3.dp))
+                LinearProgressIndicator(
+                    progress = pct / 100f,
+                    color = ColorProvider(colorFor(metric.severity)),
+                    backgroundColor = ColorProvider(Surface),
+                    modifier = GlanceModifier.fillMaxWidth()
+                )
+            }
         }
     }
 

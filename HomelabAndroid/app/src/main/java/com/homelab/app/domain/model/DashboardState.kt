@@ -118,7 +118,15 @@ data class CalendarEntry(
 data class TileMetric(
     val label: String,
     val value: Int,
-    val severity: TileSeverity
+    val severity: TileSeverity,
+    /**
+     * 0..100 when the figure is a proportion of something, which lets the widget draw a bar instead
+     * of only printing a number. Null when there is no denominator — Nextcloud's free disk space is
+     * the case in point: serverinfo reports free bytes but no total, so it can only ever be text.
+     */
+    val percent: Int? = null,
+    /** Optional unit shown after the number, e.g. "GB". */
+    val suffix: String? = null
 )
 
 @Serializable
