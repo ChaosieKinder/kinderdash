@@ -15,7 +15,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DashboardState(
     val tiles: List<DashboardTile>,
-    val generatedAtMillis: Long
+    val generatedAtMillis: Long,
+    /**
+     * Preferred Seerr instance, resolved at refresh time so the widget's search shortcut can jump
+     * straight to it. Null when Seerr isn't set up, which is what hides the shortcut.
+     */
+    val seerrInstanceId: String? = null
 ) {
     /** True if any reachable service is reporting something the user should look at. */
     val hasProblem: Boolean

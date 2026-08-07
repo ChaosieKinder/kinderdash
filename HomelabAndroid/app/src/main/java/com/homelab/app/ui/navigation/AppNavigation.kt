@@ -136,8 +136,16 @@ private fun loginRoute(type: ServiceType, instanceId: String? = null): String {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(startRoute: String? = null) {
     val navController = rememberNavController()
+
+    // Deep link from the widget. Keyed on the route and run once per value, so returning to the app
+    // later doesn't yank the user back to wherever the widget pointed.
+    androidx.compose.runtime.LaunchedEffect(startRoute) {
+        val route = startRoute?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        runCatching { navController.navigate(route) }
+    }
+
     // Settings is deliberately not a tab: it's a rarely-used destination reached from the Home
     // top bar. Screen.Settings still exists as a route — it just isn't in the bottom bar.
     val items = listOf(Screen.Home, Screen.Media, Screen.Bookmarks)

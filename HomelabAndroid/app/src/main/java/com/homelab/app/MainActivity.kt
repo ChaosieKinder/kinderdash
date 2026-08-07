@@ -160,7 +160,7 @@ class MainActivity : AppCompatActivity() {
                         val settingsVm = ViewModelProvider(this@MainActivity)[SettingsViewModel::class.java]
                         val popupState by settingsVm.updatePopupState.collectAsStateWithLifecycle()
 
-                        AppNavigation()
+                        AppNavigation(startRoute = intent?.getStringExtra(EXTRA_START_ROUTE))
 
                         popupState?.let { popup ->
                             UpdatePopupDialog(
@@ -214,5 +214,13 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.Default) {
             servicesRepository.checkTailscale()
         }
+    }
+
+    companion object {
+        /**
+         * Route to open instead of Home. Set by the widget's search shortcut so a tap lands on the
+         * Seerr screen rather than on the home tab with the user still two taps away.
+         */
+        const val EXTRA_START_ROUTE = "com.homelab.app.START_ROUTE"
     }
 }

@@ -69,7 +69,14 @@ class DashboardAggregator @Inject constructor(
             async { transmissionTile() }
         ).map { it.await() }
 
-        DashboardState(tiles = tiles, generatedAtMillis = nowMillis)
+        val seerr = runCatching { serviceInstances.getPreferredInstance(ServiceType.JELLYSEERR) }
+            .getOrNull()
+
+        DashboardState(
+            tiles = tiles,
+            generatedAtMillis = nowMillis,
+            seerrInstanceId = seerr?.id
+        )
     }
 
     private suspend fun komodoTile(): DashboardTile =

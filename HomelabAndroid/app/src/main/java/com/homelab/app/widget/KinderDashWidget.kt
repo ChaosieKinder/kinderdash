@@ -118,7 +118,8 @@ class KinderDashWidget : GlanceAppWidget() {
             // service too many would just make a tile vanish. This scrolls instead.
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 val rows = buildRows(tiles, twoColumn)
-                rows.forEach { row ->
+                val seerrId = state.seerrInstanceId
+                rows.forEachIndexed { rowIndex, row ->
                     item {
                         Column {
                             Row(modifier = GlanceModifier.fillMaxWidth()) {
@@ -134,10 +135,56 @@ class KinderDashWidget : GlanceAppWidget() {
                                 }
                             }
                             Spacer(GlanceModifier.size(8.dp))
+
+                            // Directly beneath the calendar, full width. A widget cannot host a
+                            // text field — RemoteViews has no EditText, so Glance has no
+                            // TextField — which makes this a shortcut into the app's Seerr search
+                            // rather than a search box.
+                            if (rowIndex == 0 && seerrId != null) {
+                                SeerrSearchRow(seerrId)
+                                Spacer(GlanceModifier.size(8.dp))
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun SeerrSearchRow(seerrInstanceId: String) {
+        val context = androidx.glance.LocalContext.current
+        val intent = android.content.Intent(context, com.homelab.app.MainActivity::class.java)
+            .setAction(android.content.Intent.ACTION_VIEW)
+            .putExtra(
+                com.homelab.app.MainActivity.EXTRA_START_ROUTE,
+                "media/${com.homelab.app.util.ServiceType.JELLYSEERR.name}/$seerrInstanceId/dashboard"
+            )
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+        Row(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .background(Card)
+                .cornerRadius(14.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp)
+                .clickable(androidx.glance.appwidget.action.actionStartActivity(intent)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Search for something to watch",
+                maxLines = 1,
+                style = TextStyle(color = ColorProvider(Foreground), fontSize = 15.sp()),
+                modifier = GlanceModifier.defaultWeight()
+            )
+            Text(
+                text = "→",
+                style = TextStyle(
+                    color = ColorProvider(Muted),
+                    fontSize = 15.sp(),
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
     }
 
