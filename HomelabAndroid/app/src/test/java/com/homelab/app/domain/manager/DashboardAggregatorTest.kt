@@ -74,8 +74,7 @@ class DashboardAggregatorTest {
         coEvery { mediaArr.getSeerrSummary(any()) } returns SeerrSummary(pendingRequests = 0, totalRequests = 40)
         coEvery { grafana.getSummary(any()) } returns GrafanaSummary(firingAlerts = 0, totalAlerts = 3)
         coEvery { homeAssistant.getSummary(any()) } returns HomeAssistantSummary(lightsOn = 2, unavailableEntities = 0, totalEntities = 300)
-        coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000,
-            memTotalKb = 16_000_000L, memFreeKb = 8_000_000L)
+        coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000)
         coEvery { transmission.getSummary(any()) } returns TransmissionSummary(activeTorrents = 3, erroredTorrents = 0, totalTorrents = 10)
         coEvery { mediaArr.getCalendar(any(), any(), any()) } returns emptyList()
     }
@@ -172,25 +171,10 @@ class DashboardAggregatorTest {
     }
 
     @Test
-    fun `nextcloud omits the memory bar when totals are not reported`() = runTest {
-        // memTotalKb = 0 means the instance reported nothing to divide by; a bar would be invented.
-        happyPath()
-        coEvery { nextcloud.getSummary(any()) } returns
-            NextcloudSummary(freeSpaceBytes = 1L, activeUsers24h = 0, numFiles = 1, memTotalKb = 0L, memFreeKb = 0L)
-
-        val metrics = (aggregator().load(0L).tiles.single { it.key == DashboardTileKey.NEXTCLOUD }
-            .status as TileStatus.Ready).metrics
-
-        assertEquals(emptyList<String>(), metrics.filter { it.label == "Memory" }.map { it.label })
-        assertEquals(null, metrics.single { it.label == "Free" }.percent)
-    }
-
-    @Test
     fun `nextcloud free space is reported in whole GB`() = runTest {
         happyPath()
         coEvery { nextcloud.getSummary(any()) } returns
-            NextcloudSummary(freeSpaceBytes = 3L * 1_073_741_824L, activeUsers24h = 0, numFiles = 1,
-                memTotalKb = 0L, memFreeKb = 0L)
+            NextcloudSummary(freeSpaceBytes = 3L * 1_073_741_824L, activeUsers24h = 0, numFiles = 1)
 
         assertEquals(3, metric(aggregator().load(0L).tiles, DashboardTileKey.NEXTCLOUD, "Free").value)
     }

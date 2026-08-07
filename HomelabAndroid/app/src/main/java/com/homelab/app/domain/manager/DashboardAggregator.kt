@@ -199,21 +199,6 @@ class DashboardAggregator @Inject constructor(
                 }
                 add(TileMetric("Free", summary.freeSpaceGb, TileSeverity.NEUTRAL, suffix = "GB"))
                 add(TileMetric("Files", summary.numFiles.toInt(), TileSeverity.NEUTRAL))
-                summary.memoryUsedPercent?.let { used ->
-                    add(
-                        TileMetric(
-                            label = "Memory",
-                            value = used,
-                            severity = when {
-                                used >= 90 -> TileSeverity.DANGER
-                                used >= 75 -> TileSeverity.WARNING
-                                else -> TileSeverity.GOOD
-                            },
-                            percent = used,
-                            suffix = "%"
-                        )
-                    )
-                }
             }
         }
 
