@@ -10,7 +10,7 @@
     <string name="error_timeout">Request timed out. The server took too long to respond.</string>
     <string name="error_network">Network error. Please check your internet connection.</string>
     <string name="error_parsing">Data parsing error. The server response is not in the expected format.</string>
-    <string name="error_html_response">The server returned an HTML page instead of JSON. Check your proxy/SSO configuration.</string>
+    <string name="error_html_response">The server returned a web page instead of API data. This usually means the address is behind a reverse proxy or SSO login. Try the service\'s direct address on your network (for example http://192.168.1.10:8989) rather than its public URL.</string>
     <string name="error_service_unavailable">Service unavailable</string>
     <string name="error_invalid_credentials">Invalid credentials. Please check your API key or login details.</string>
     <string name="error_forbidden">Access denied. You don\'t have permission to view this.</string>
