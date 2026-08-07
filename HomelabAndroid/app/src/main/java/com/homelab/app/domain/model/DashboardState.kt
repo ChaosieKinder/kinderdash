@@ -91,12 +91,28 @@ sealed interface TileStatus {
  */
 @Serializable
 data class CalendarDay(
-    /** Short label already resolved for display, e.g. "Mon" — or "Today"/"Yest". */
+    /** Short weekday name, e.g. "Mon". Today is marked by [isToday], not by its label. */
     val label: String,
     val total: Int,
     val downloaded: Int,
-    val isToday: Boolean
+    val isToday: Boolean,
+    val entries: List<CalendarEntry> = emptyList()
 )
+
+/**
+ * One series airing on a given day, collapsed across its episodes.
+ *
+ * Grouped by series rather than listed per episode because a season drop would otherwise fill the
+ * whole widget with eight lines of the same show.
+ */
+@Serializable
+data class CalendarEntry(
+    val seriesTitle: String,
+    val episodeCount: Int,
+    val downloadedCount: Int
+) {
+    val allDownloaded: Boolean get() = episodeCount > 0 && downloadedCount == episodeCount
+}
 
 @Serializable
 data class TileMetric(

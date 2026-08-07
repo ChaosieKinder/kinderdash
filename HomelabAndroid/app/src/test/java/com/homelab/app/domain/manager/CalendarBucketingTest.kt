@@ -31,14 +31,33 @@ class CalendarBucketingTest {
     )
 
     @Test
-    fun `produces seven days, yesterday through five ahead`() {
+    fun `produces seven days, yesterday through five ahead, labelled by weekday`() {
         val days = aggregator.bucketCalendar(emptyList(), chicago, today)
 
         assertEquals(7, days.size)
-        assertEquals("Yest", days.first().label)
-        assertEquals("Today", days[1].label)
         assertTrue(days[1].isToday)
         assertEquals(1, days.count { it.isToday })
+        // 2026-08-06 is a Thursday, so yesterday is Wednesday. Today is labelled by its weekday
+        // like any other day — the highlight is what marks it.
+        assertEquals("Wed", days.first().label)
+        assertEquals("Thu", days[1].label)
+    }
+
+    @Test
+    fun `episodes of one series on one day collapse into a single entry`() {
+        // A season drop would otherwise fill the widget with eight lines of the same show.
+        val tonight = ZonedDateTime.of(2026, 8, 6, 20, 0, 0, 0, chicago)
+        val episodes = List(8) { episodeAt(tonight, hasFile = it < 5) }
+
+        val entry = aggregator.bucketCalendar(episodes, chicago, today)
+            .single { it.isToday }
+            .entries
+            .single()
+
+        assertEquals("Some Series", entry.seriesTitle)
+        assertEquals(8, entry.episodeCount)
+        assertEquals(5, entry.downloadedCount)
+        assertEquals(false, entry.allDownloaded)
     }
 
     @Test

@@ -10,6 +10,7 @@ import com.homelab.app.data.repository.PlexRepository
 import com.homelab.app.data.repository.ServiceInstancesRepository
 import com.homelab.app.data.repository.UptimeKumaRepository
 import com.homelab.app.domain.model.CalendarDay
+import com.homelab.app.domain.model.CalendarEntry
 import com.homelab.app.domain.model.DashboardState
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.DashboardTileKey
@@ -59,6 +60,8 @@ class DashboardAggregator @Inject constructor(
     suspend fun load(nowMillis: Long): DashboardState = coroutineScope {
         // Parallel: the slowest service sets the refresh time, not the sum of all of them.
         val tiles = listOf(
+            // Calendar first: it's the tallest tile and the one most worth landing on.
+            async { calendarTile() },
             async { komodoTile() },
             async { uptimeKumaTile() },
             async { plexTile() },
@@ -66,8 +69,7 @@ class DashboardAggregator @Inject constructor(
             async { grafanaTile() },
             async { homeAssistantTile() },
             async { nextcloudTile() },
-            async { transmissionTile() },
-            async { calendarTile() }
+            async { transmissionTile() }
         ).map { it.await() }
 
         DashboardState(tiles = tiles, generatedAtMillis = nowMillis)
@@ -226,17 +228,25 @@ class DashboardAggregator @Inject constructor(
             val date = today.plusDays(offset.toLong())
             val forDay = byDate[date].orEmpty()
             CalendarDay(
-                label = when (offset) {
-                    0 -> "Today"
-                    -1 -> "Yest"
-                    else -> date.dayOfWeek.getDisplayName(
-                        java.time.format.TextStyle.SHORT,
-                        java.util.Locale.getDefault()
-                    )
-                },
+                // Always the weekday name — "Today" as a label was redundant once the column is
+                // highlighted, and it cost the reader the actual day.
+                label = date.dayOfWeek.getDisplayName(
+                    java.time.format.TextStyle.SHORT,
+                    java.util.Locale.getDefault()
+                ),
                 total = forDay.size,
                 downloaded = forDay.count { it.hasFile },
-                isToday = offset == 0
+                isToday = offset == 0,
+                entries = forDay
+                    .groupBy { it.seriesTitle.ifBlank { it.episodeTitle } }
+                    .map { (series, episodes) ->
+                        CalendarEntry(
+                            seriesTitle = series,
+                            episodeCount = episodes.size,
+                            downloadedCount = episodes.count { it.hasFile }
+                        )
+                    }
+                    .sortedBy { it.seriesTitle }
             )
         }
     }

@@ -23,6 +23,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -31,6 +32,7 @@ import com.homelab.app.data.local.DashboardSnapshotStore
 import com.homelab.app.data.repository.LocalPreferencesRepository
 import kotlinx.coroutines.flow.first
 import com.homelab.app.domain.model.CalendarDay
+import com.homelab.app.domain.model.CalendarEntry
 import com.homelab.app.domain.model.DashboardState
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.TileMetric
@@ -202,52 +204,79 @@ class KinderDashWidget : GlanceAppWidget() {
     }
 
     /**
-     * Seven day columns: yesterday, today, and five ahead.
+     * A week of TV, one row per day, with the series airing that day.
      *
-     * Each column is "airing / downloaded" as a fraction rather than two numbers — at widget scale
-     * there is room for one glanceable figure per day, and "2/3" answers both questions at once.
-     * A day with nothing scheduled shows a dash, so empty days read as empty rather than as zero
-     * of something.
+     * Vertical rather than seven columns because there is no horizontal scrolling to fall back on:
+     * Glance 1.1.1 ships LazyColumn and LazyVerticalGrid only — RemoteViews has no horizontally
+     * scrolling container — so a wide layout would have to fit the widget or be clipped. Listing
+     * downwards also gives series names room to be readable, which columns never would.
      */
     @androidx.compose.runtime.Composable
     private fun CalendarWeek(days: List<CalendarDay>) {
-        Row(modifier = GlanceModifier.fillMaxWidth()) {
-            days.forEach { day ->
-                Column(
-                    modifier = GlanceModifier.defaultWeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = day.label,
-                        maxLines = 1,
-                        style = TextStyle(
-                            // Today is the column the eye should land on first.
-                            color = ColorProvider(if (day.isToday) Foreground else Muted),
-                            fontSize = 10.sp(),
-                            fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
+        days.forEach { day ->
+            Row(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Text(
+                    text = day.label,
+                    maxLines = 1,
+                    style = TextStyle(
+                        // The only marker for today, now that the label is a plain weekday name.
+                        color = ColorProvider(if (day.isToday) Foreground else Muted),
+                        fontSize = 12.sp(),
+                        fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    modifier = GlanceModifier.width(38.dp)
+                )
+
+                Column(modifier = GlanceModifier.defaultWeight()) {
+                    if (day.entries.isEmpty()) {
+                        Text(
+                            text = "–",
+                            style = TextStyle(color = ColorProvider(Muted), fontSize = 12.sp())
                         )
-                    )
-                    Spacer(GlanceModifier.size(2.dp))
-                    Text(
-                        text = if (day.total == 0) "–" else "${day.downloaded}/${day.total}",
-                        maxLines = 1,
-                        style = TextStyle(
-                            color = ColorProvider(
-                                when {
-                                    day.total == 0 -> Muted
-                                    // Everything that aired is on disk — nothing to do.
-                                    day.downloaded == day.total -> Good
-                                    // Something aired and has not landed. Warning, not danger:
-                                    // an episode airing tonight is not a fault.
-                                    else -> Warning
-                                }
-                            ),
-                            fontSize = 13.sp(),
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
+                    } else {
+                        day.entries.take(MAX_SERIES_PER_DAY).forEach { entry ->
+                            CalendarEntryRow(entry)
+                        }
+                        val hidden = day.entries.size - MAX_SERIES_PER_DAY
+                        if (hidden > 0) {
+                            Text(
+                                text = "+$hidden more",
+                                style = TextStyle(color = ColorProvider(Muted), fontSize = 11.sp())
+                            )
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun CalendarEntryRow(entry: CalendarEntry) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (entry.episodeCount > 1) "${entry.seriesTitle} ×${entry.episodeCount}"
+                       else entry.seriesTitle,
+                maxLines = 1,
+                style = TextStyle(color = ColorProvider(Foreground), fontSize = 12.sp()),
+                modifier = GlanceModifier.defaultWeight()
+            )
+            Text(
+                // A tick when the whole night has landed; otherwise how much of it has, which is
+                // the number you actually want mid-download.
+                text = when {
+                    entry.allDownloaded -> "✓"
+                    entry.episodeCount == 1 -> "·"
+                    else -> "${entry.downloadedCount}/${entry.episodeCount}"
+                },
+                style = TextStyle(
+                    color = ColorProvider(if (entry.allDownloaded) Good else Warning),
+                    fontSize = 12.sp(),
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
     }
 
@@ -299,6 +328,9 @@ class KinderDashWidget : GlanceAppWidget() {
         val Good = Color(0xFF4ADE80)
         val Warning = Color(0xFFFACC15)
         val Danger = Color(0xFFF87171)
+
+        /** Past this, a season drop would push every other tile off the widget. */
+        const val MAX_SERIES_PER_DAY = 3
     }
 }
 
