@@ -13,7 +13,7 @@ import org.junit.Test
 class NextcloudCapacityTest {
 
     private val aggregator = DashboardAggregator(
-        mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk()
+        mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk()
     )
 
     @Test

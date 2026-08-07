@@ -76,7 +76,6 @@ fun SettingsScreen(
     val hiddenServices by viewModel.hiddenServices.collectAsStateWithLifecycle()
     val serviceOrder by viewModel.serviceOrder.collectAsStateWithLifecycle()
     val widgetTitle by viewModel.widgetTitle.collectAsStateWithLifecycle()
-    val nextcloudCapacityGb by viewModel.nextcloudCapacityGb.collectAsStateWithLifecycle()
     val isPinSet by viewModel.isPinSet.collectAsStateWithLifecycle()
 
 
@@ -244,26 +243,6 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                var capacityDraft by remember(nextcloudCapacityGb) {
-                    mutableStateOf(if (nextcloudCapacityGb > 0) nextcloudCapacityGb.toString() else "")
-                }
-                OutlinedTextField(
-                    value = capacityDraft,
-                    onValueChange = {
-                        capacityDraft = it.filter { ch -> ch.isDigit() }
-                        viewModel.setNextcloudCapacityGb(capacityDraft)
-                    },
-                    label = { Text(stringResource(R.string.settings_nextcloud_capacity_label)) },
-                    supportingText = { Text(stringResource(R.string.settings_nextcloud_capacity_hint)) },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
 
             // --- THEME SELECTOR ---

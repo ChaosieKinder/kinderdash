@@ -34,6 +34,7 @@ data class BackupServiceEntry(
     val fallbackUrl: String? = null,
     val allowSelfSigned: Boolean,
     val password: String? = null,
+    val storageCapacityGb: Int = 0,
     val isPreferred: Boolean
 )
 
@@ -167,6 +168,7 @@ fun ServiceInstance.toBackupEntry(isPreferred: Boolean): BackupServiceEntry {
         fallbackUrl = fallbackUrl,
         allowSelfSigned = allowSelfSigned,
         password = password,
+        storageCapacityGb = storageCapacityGb,
         isPreferred = isPreferred
     )
 }
@@ -186,6 +188,7 @@ fun BackupServiceEntry.toServiceInstance(): ServiceInstance? {
         piholeAuthMode = BackupServiceTypeMapper.piholeAuthMode(piholeAuthMode),
         fallbackUrl = fallbackUrl,
         allowSelfSigned = allowSelfSigned,
-        password = password
+        password = password,
+        storageCapacityGb = storageCapacityGb
     )
 }

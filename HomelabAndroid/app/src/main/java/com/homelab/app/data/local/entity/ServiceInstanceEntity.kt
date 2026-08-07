@@ -20,5 +20,11 @@ data class ServiceInstanceEntity(
     val fallbackUrl: String?,
     @ColumnInfo(defaultValue = "0")
     val allowSelfSigned: Boolean,
-    val password: String? = null
+    val password: String? = null,
+    /**
+     * Total storage in GB, entered by hand. Nextcloud only, and only because serverinfo reports
+     * free space with no matching total. 0 means unset. Not a credential, so it is not encrypted.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val storageCapacityGb: Int = 0
 )

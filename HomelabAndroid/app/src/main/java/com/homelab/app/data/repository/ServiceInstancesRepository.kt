@@ -203,7 +203,8 @@ class ServiceInstancesRepository @Inject constructor(
             piholeAuthMode = piholeAuthMode?.let(PiHoleAuthMode::valueOf),
             fallbackUrl = fallbackUrl,
             allowSelfSigned = allowSelfSigned,
-            password = credentialCipher.decrypt(password)
+            password = credentialCipher.decrypt(password),
+            storageCapacityGb = storageCapacityGb
         )
     }
 
@@ -222,7 +223,8 @@ class ServiceInstancesRepository @Inject constructor(
             piholeAuthMode = piholeAuthMode?.name,
             fallbackUrl = fallbackUrl,
             allowSelfSigned = allowSelfSigned,
-            password = credentialCipher.encrypt(password)
+            password = credentialCipher.encrypt(password),
+            storageCapacityGb = storageCapacityGb
         )
     }
 }

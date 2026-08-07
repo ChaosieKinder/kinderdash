@@ -24,7 +24,9 @@ data class ServiceInstance(
     val piholeAuthMode: PiHoleAuthMode? = null,
     val fallbackUrl: String? = null,
     val allowSelfSigned: Boolean = false,
-    val password: String? = null
+    val password: String? = null,
+    /** Nextcloud only: hand-entered total storage in GB. 0 means unset. */
+    val storageCapacityGb: Int = 0
 ) {
     val piHoleStoredSecret: String?
         get() = when {

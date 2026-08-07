@@ -157,7 +157,8 @@ class ServiceLoginViewModel @Inject constructor(
         allowSelfSigned: Boolean = true,
         proxmoxRealm: String = "pam",
         proxmoxOtp: String = "",
-        proxmoxUseApiToken: Boolean = false
+        proxmoxUseApiToken: Boolean = false,
+        storageCapacityGb: Int = 0
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -330,7 +331,8 @@ class ServiceLoginViewModel @Inject constructor(
                             ServiceInstance(
                                 id = instanceId, type = serviceType, label = normalizedLabel,
                                 url = cleanUrl, token = trimmedApiKey,
-                                fallbackUrl = cleanFallbackUrl, allowSelfSigned = allowSelfSigned
+                                fallbackUrl = cleanFallbackUrl, allowSelfSigned = allowSelfSigned,
+                                storageCapacityGb = storageCapacityGb
                             )
                         }
                         ServiceType.TRANSMISSION -> {

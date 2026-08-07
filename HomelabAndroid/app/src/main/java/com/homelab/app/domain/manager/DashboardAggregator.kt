@@ -1,7 +1,6 @@
 package com.homelab.app.domain.manager
 
 import com.homelab.app.data.repository.GrafanaRepository
-import com.homelab.app.data.repository.LocalPreferencesRepository
 import com.homelab.app.data.repository.HomeAssistantRepository
 import com.homelab.app.data.repository.NextcloudRepository
 import com.homelab.app.data.repository.TransmissionRepository
@@ -13,6 +12,7 @@ import com.homelab.app.data.repository.UptimeKumaRepository
 import com.homelab.app.domain.model.CalendarDay
 import com.homelab.app.domain.model.CalendarEntry
 import com.homelab.app.domain.model.DashboardState
+import com.homelab.app.domain.model.ServiceInstance
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.DashboardTileKey
 import com.homelab.app.domain.model.TileMetric
@@ -21,7 +21,6 @@ import com.homelab.app.domain.model.TileStatus
 import com.homelab.app.util.Logger
 import com.homelab.app.util.ServiceType
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -57,7 +56,7 @@ class DashboardAggregator @Inject constructor(
     private val homeAssistant: HomeAssistantRepository,
     private val nextcloud: NextcloudRepository,
     private val transmission: TransmissionRepository,
-    private val localPreferences: LocalPreferencesRepository
+
 ) {
 
     suspend fun load(nowMillis: Long): DashboardState = coroutineScope {
@@ -83,10 +82,10 @@ class DashboardAggregator @Inject constructor(
     }
 
     private suspend fun komodoTile(): DashboardTile =
-        tile(DashboardTileKey.KOMODO, ServiceType.KOMODO) { instanceId ->
+        tile(DashboardTileKey.KOMODO, ServiceType.KOMODO) { instance ->
             // getDashboard(), not getSummary(): the lighter getSummary() omits `unhealthy`, which is
             // the single most important number on this widget.
-            val containers = komodo.getDashboard(instanceId).containers
+            val containers = komodo.getDashboard(instance.id).containers
             listOf(
                 TileMetric(
                     label = "Stopped",
@@ -102,8 +101,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun uptimeKumaTile(): DashboardTile =
-        tile(DashboardTileKey.UPTIME_KUMA, ServiceType.UPTIME_KUMA) { instanceId ->
-            val summary = uptimeKuma.getSummary(instanceId)
+        tile(DashboardTileKey.UPTIME_KUMA, ServiceType.UPTIME_KUMA) { instance ->
+            val summary = uptimeKuma.getSummary(instance.id)
             // Reported as "down" rather than "up": the widget exists to surface problems, and a
             // count of 0 is the shape the eye should skip over.
             val down = (summary.totalCount - summary.upCount).coerceAtLeast(0)
@@ -125,8 +124,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun plexTile(): DashboardTile =
-        tile(DashboardTileKey.PLEX, ServiceType.PLEX) { instanceId ->
-            val summary = plex.getSummary(instanceId)
+        tile(DashboardTileKey.PLEX, ServiceType.PLEX) { instance ->
+            val summary = plex.getSummary(instance.id)
             listOf(
                 TileMetric("Streams", summary.activeStreams, TileSeverity.NEUTRAL),
                 TileMetric("Playing", summary.playingStreams, TileSeverity.NEUTRAL),
@@ -135,8 +134,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun seerrTile(): DashboardTile =
-        tile(DashboardTileKey.SEERR, ServiceType.JELLYSEERR) { instanceId ->
-            val summary = mediaArr.getSeerrSummary(instanceId)
+        tile(DashboardTileKey.SEERR, ServiceType.JELLYSEERR) { instance ->
+            val summary = mediaArr.getSeerrSummary(instance.id)
             listOf(
                 TileMetric(
                     label = "Pending",
@@ -148,8 +147,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun grafanaTile(): DashboardTile =
-        tile(DashboardTileKey.GRAFANA, ServiceType.GRAFANA) { instanceId ->
-            val summary = grafana.getSummary(instanceId)
+        tile(DashboardTileKey.GRAFANA, ServiceType.GRAFANA) { instance ->
+            val summary = grafana.getSummary(instance.id)
             listOf(
                 TileMetric(
                     label = "Firing",
@@ -162,8 +161,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun homeAssistantTile(): DashboardTile =
-        tile(DashboardTileKey.HOME_ASSISTANT, ServiceType.HOME_ASSISTANT) { instanceId ->
-            val summary = homeAssistant.getSummary(instanceId)
+        tile(DashboardTileKey.HOME_ASSISTANT, ServiceType.HOME_ASSISTANT) { instance ->
+            val summary = homeAssistant.getSummary(instance.id)
             listOf(
                 TileMetric("Lights on", summary.lightsOn, TileSeverity.NEUTRAL),
                 TileMetric("Entities", summary.totalEntities, TileSeverity.NEUTRAL),
@@ -178,15 +177,12 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun nextcloudTile(): DashboardTile =
-        tile(DashboardTileKey.NEXTCLOUD, ServiceType.NEXTCLOUD) { instanceId ->
-            val summary = nextcloud.getSummary(instanceId)
-            val capacityGb = runCatching { localPreferences.nextcloudCapacityGb.first() }
-                .getOrDefault(0)
-
+        tile(DashboardTileKey.NEXTCLOUD, ServiceType.NEXTCLOUD) { instance ->
+            val summary = nextcloud.getSummary(instance.id)
             buildList {
                 // serverinfo reports free bytes with no matching total, so the denominator has to
                 // be supplied by hand. usedPercentOrNull rejects values that cannot be true.
-                usedPercentOrNull(freeGb = summary.freeSpaceGb, capacityGb = capacityGb)?.let { used ->
+                usedPercentOrNull(freeGb = summary.freeSpaceGb, capacityGb = instance.storageCapacityGb)?.let { used ->
                     add(
                         TileMetric(
                             label = "Storage",
@@ -222,8 +218,8 @@ class DashboardAggregator @Inject constructor(
         }
 
     private suspend fun transmissionTile(): DashboardTile =
-        tile(DashboardTileKey.TRANSMISSION, ServiceType.TRANSMISSION) { instanceId ->
-            val summary = transmission.getSummary(instanceId)
+        tile(DashboardTileKey.TRANSMISSION, ServiceType.TRANSMISSION) { instance ->
+            val summary = transmission.getSummary(instance.id)
             listOf(
                 TileMetric("Active", summary.activeTorrents, TileSeverity.NEUTRAL),
                 TileMetric("Torrents", summary.totalTorrents, TileSeverity.NEUTRAL),
@@ -242,7 +238,7 @@ class DashboardAggregator @Inject constructor(
      * land?", which a today-onwards calendar cannot answer.
      */
     private suspend fun calendarTile(): DashboardTile =
-        loadedTile(DashboardTileKey.CALENDAR, ServiceType.SONARR) { instanceId ->
+        loadedTile(DashboardTileKey.CALENDAR, ServiceType.SONARR) { instance ->
             val zone = java.time.ZoneId.systemDefault()
             val today = java.time.LocalDate.now(zone)
             val format = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
@@ -251,7 +247,7 @@ class DashboardAggregator @Inject constructor(
             // so an episode sitting just inside a local-midnight boundary can fall outside a range
             // that looks correct locally. Cheap insurance; bucketing discards the extras.
             val episodes = mediaArr.getCalendar(
-                instanceId,
+                instance.id,
                 startDate = today.minusDays(CALENDAR_DAYS_BEFORE + 1L).format(format),
                 endDate = today.plusDays(CALENDAR_DAYS_AFTER + 1L).format(format)
             )
@@ -331,7 +327,7 @@ class DashboardAggregator @Inject constructor(
     private suspend fun tile(
         key: DashboardTileKey,
         type: ServiceType,
-        fetch: suspend (instanceId: String) -> List<TileMetric>
+        fetch: suspend (instance: ServiceInstance) -> List<TileMetric>
     ): DashboardTile = loadedTile(key, type) { TileStatus.Ready(fetch(it)) }
 
     /**
@@ -343,7 +339,7 @@ class DashboardAggregator @Inject constructor(
     private suspend fun loadedTile(
         key: DashboardTileKey,
         type: ServiceType,
-        fetch: suspend (instanceId: String) -> TileStatus.Loaded
+        fetch: suspend (instance: ServiceInstance) -> TileStatus.Loaded
     ): DashboardTile {
         val instance = try {
             serviceInstances.getPreferredInstance(type)
@@ -361,7 +357,7 @@ class DashboardAggregator @Inject constructor(
         val title = instance.label.ifBlank { type.displayName }
 
         return try {
-            DashboardTile(key, title, withTimeout(PER_TILE_TIMEOUT_MS) { fetch(instance.id) })
+            DashboardTile(key, title, withTimeout(PER_TILE_TIMEOUT_MS) { fetch(instance) })
         } catch (error: TimeoutCancellationException) {
             // Caught BEFORE CancellationException on purpose — withTimeout signals by throwing a
             // subclass of it, so the usual "rethrow cancellation" rule would swallow our own timeout

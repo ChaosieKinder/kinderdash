@@ -16,7 +16,7 @@ import java.time.ZonedDateTime
 class CalendarBucketingTest {
 
     private val aggregator = DashboardAggregator(
-        mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk()
+        mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk(), mockk()
     )
 
     /** US Eastern: far enough behind UTC that late-evening broadcasts land on the next UTC day. */

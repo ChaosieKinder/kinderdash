@@ -109,6 +109,8 @@ fun ServiceLoginScreen(
     var allowSelfSigned by rememberSaveable { mutableStateOf(true) }
     var showSecret by rememberSaveable { mutableStateOf(false) }
     var hasSubmitted by rememberSaveable { mutableStateOf(false) }
+    // Nextcloud only — see the field below for why it exists at all.
+    var storageCapacityGb by rememberSaveable { mutableStateOf("") }
 
     // Credentials survive rotation via the ViewModel, which outlives Activity recreation WITHOUT
     // being written anywhere. rememberSaveable would have been one word shorter, but it stores
@@ -157,6 +159,7 @@ fun ServiceLoginScreen(
             apiKey = instance.apiKey.orEmpty()
         }
         fallbackUrl = instance.fallbackUrl.orEmpty()
+        storageCapacityGb = instance.storageCapacityGb.takeIf { it > 0 }?.toString().orEmpty()
         allowSelfSigned = instance.allowSelfSigned
         password = ""
         mfaCode = ""
@@ -433,7 +436,8 @@ fun ServiceLoginScreen(
                     allowSelfSigned = allowSelfSigned,
                     proxmoxRealm = proxmoxRealm,
                     proxmoxOtp = proxmoxOtp,
-                    proxmoxUseApiToken = proxmoxUseApiToken
+                    proxmoxUseApiToken = proxmoxUseApiToken,
+                    storageCapacityGb = storageCapacityGb.toIntOrNull() ?: 0
                 )
             }
 
@@ -561,6 +565,24 @@ fun ServiceLoginScreen(
                         showSecret = showSecret,
                         onToggleSecret = { showSecret = !showSecret },
                         placeholder = if (isEditing) stringResource(R.string.login_keep_secret_placeholder) else null
+                    )
+                }
+
+                if (serviceType == ServiceType.NEXTCLOUD) {
+                    OutlinedTextField(
+                        value = storageCapacityGb,
+                        onValueChange = { storageCapacityGb = it.filter { ch -> ch.isDigit() } },
+                        label = { Text(stringResource(R.string.settings_nextcloud_capacity_label)) },
+                        supportingText = { Text(stringResource(R.string.settings_nextcloud_capacity_hint)) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 14.dp),
+                        shape = RoundedCornerShape(14.dp)
                     )
                 }
 

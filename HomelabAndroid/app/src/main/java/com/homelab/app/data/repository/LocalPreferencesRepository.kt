@@ -53,7 +53,6 @@ class LocalPreferencesRepository @Inject constructor(
 
     private val THEME_KEY = stringPreferencesKey("theme_mode")
     private val WIDGET_TITLE_KEY = stringPreferencesKey("widget_title")
-    private val NEXTCLOUD_CAPACITY_GB_KEY = androidx.datastore.preferences.core.intPreferencesKey("nextcloud_capacity_gb")
     private val LANG_KEY = stringPreferencesKey("language_mode")
     private val HIDDEN_SERVICES_KEY = stringPreferencesKey("hidden_services")
     private val SERVICE_ORDER_KEY = stringPreferencesKey("service_order")
@@ -114,26 +113,6 @@ class LocalPreferencesRepository @Inject constructor(
         .map { preferences ->
             preferences[WIDGET_TITLE_KEY]?.takeIf { it.isNotBlank() } ?: DEFAULT_WIDGET_TITLE
         }
-
-    /**
-     * Total Nextcloud storage in GB, supplied by hand because serverinfo reports free space with no
-     * matching total. 0 means unset, which is also what any nonsensical value collapses to.
-     */
-    val nextcloudCapacityGb: Flow<Int> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) emit(emptyPreferences()) else throw exception
-        }
-        .map { preferences -> preferences[NEXTCLOUD_CAPACITY_GB_KEY]?.takeIf { it > 0 } ?: 0 }
-
-    suspend fun setNextcloudCapacityGb(capacityGb: Int) {
-        dataStore.edit { preferences ->
-            if (capacityGb > 0) {
-                preferences[NEXTCLOUD_CAPACITY_GB_KEY] = capacityGb
-            } else {
-                preferences.remove(NEXTCLOUD_CAPACITY_GB_KEY)
-            }
-        }
-    }
 
     suspend fun setWidgetTitle(title: String) {
         dataStore.edit { preferences ->

@@ -155,17 +155,6 @@ class SettingsViewModel @Inject constructor(
             LocalPreferencesRepository.DEFAULT_WIDGET_TITLE
         )
 
-    val nextcloudCapacityGb: StateFlow<Int> = localPreferencesRepository.nextcloudCapacityGb
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    /** Blank or unparseable clears the value, which turns the storage bar off rather than guessing. */
-    fun setNextcloudCapacityGb(raw: String) {
-        viewModelScope.launch {
-            localPreferencesRepository.setNextcloudCapacityGb(raw.trim().toIntOrNull() ?: 0)
-            runCatching { KinderDashWidget().updateAll(appContext) }
-        }
-    }
-
     fun setWidgetTitle(title: String) {
         viewModelScope.launch {
             localPreferencesRepository.setWidgetTitle(title)
