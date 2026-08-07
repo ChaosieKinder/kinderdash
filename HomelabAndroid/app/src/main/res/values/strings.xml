@@ -1891,4 +1891,6 @@
     <string name="settings_widget_label">Home screen widget</string>
     <string name="settings_widget_title_label">Widget title</string>
     <string name="settings_widget_title_hint">Shown at the top of the widget. Leave empty for \"Homelab\".</string>
+    <string name="settings_nextcloud_capacity_label">Nextcloud total storage (GB)</string>
+    <string name="settings_nextcloud_capacity_hint">Nextcloud reports free space but not the total, so the storage bar needs this. Leave empty to hide the bar. A value smaller than the reported free space is ignored — but one that is too LARGE cannot be detected and will read as nearly full, so make it accurate.</string>
 </resources>

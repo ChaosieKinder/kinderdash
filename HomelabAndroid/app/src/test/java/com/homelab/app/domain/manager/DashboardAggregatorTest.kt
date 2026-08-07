@@ -45,9 +45,10 @@ class DashboardAggregatorTest {
     private val homeAssistant: HomeAssistantRepository = mockk()
     private val nextcloud: NextcloudRepository = mockk()
     private val transmission: TransmissionRepository = mockk()
+    private val localPreferences: com.homelab.app.data.repository.LocalPreferencesRepository = mockk()
 
     private fun aggregator() = DashboardAggregator(serviceInstances, komodo, uptimeKuma, plex, mediaArr, grafana,
-        homeAssistant, nextcloud, transmission)
+        homeAssistant, nextcloud, transmission, localPreferences)
 
     private fun instance(type: ServiceType, label: String = "") = ServiceInstance(
         id = "${type.name.lowercase()}-1",
@@ -58,6 +59,7 @@ class DashboardAggregatorTest {
 
     /** Everything configured and healthy unless a test overrides it. */
     private fun happyPath() {
+        io.mockk.every { localPreferences.nextcloudCapacityGb } returns kotlinx.coroutines.flow.flowOf(0)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.KOMODO) } returns instance(ServiceType.KOMODO)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.UPTIME_KUMA) } returns instance(ServiceType.UPTIME_KUMA)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.PLEX) } returns instance(ServiceType.PLEX)

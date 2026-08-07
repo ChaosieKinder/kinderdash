@@ -1,6 +1,7 @@
 package com.homelab.app.domain.manager
 
 import com.homelab.app.data.repository.GrafanaRepository
+import com.homelab.app.data.repository.LocalPreferencesRepository
 import com.homelab.app.data.repository.HomeAssistantRepository
 import com.homelab.app.data.repository.NextcloudRepository
 import com.homelab.app.data.repository.TransmissionRepository
@@ -20,6 +21,7 @@ import com.homelab.app.domain.model.TileStatus
 import com.homelab.app.util.Logger
 import com.homelab.app.util.ServiceType
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -54,7 +56,8 @@ class DashboardAggregator @Inject constructor(
     private val grafana: GrafanaRepository,
     private val homeAssistant: HomeAssistantRepository,
     private val nextcloud: NextcloudRepository,
-    private val transmission: TransmissionRepository
+    private val transmission: TransmissionRepository,
+    private val localPreferences: LocalPreferencesRepository
 ) {
 
     suspend fun load(nowMillis: Long): DashboardState = coroutineScope {
@@ -177,9 +180,27 @@ class DashboardAggregator @Inject constructor(
     private suspend fun nextcloudTile(): DashboardTile =
         tile(DashboardTileKey.NEXTCLOUD, ServiceType.NEXTCLOUD) { instanceId ->
             val summary = nextcloud.getSummary(instanceId)
+            val capacityGb = runCatching { localPreferences.nextcloudCapacityGb.first() }
+                .getOrDefault(0)
+
             buildList {
-                // Text, not a bar: serverinfo reports free bytes with no matching total, so there
-                // is nothing to divide by and any absolute GB threshold would be invented.
+                // serverinfo reports free bytes with no matching total, so the denominator has to
+                // be supplied by hand. usedPercentOrNull rejects values that cannot be true.
+                usedPercentOrNull(freeGb = summary.freeSpaceGb, capacityGb = capacityGb)?.let { used ->
+                    add(
+                        TileMetric(
+                            label = "Storage",
+                            value = used,
+                            severity = when {
+                                used >= 90 -> TileSeverity.DANGER
+                                used >= 75 -> TileSeverity.WARNING
+                                else -> TileSeverity.GOOD
+                            },
+                            percent = used,
+                            suffix = "%"
+                        )
+                    )
+                }
                 add(TileMetric("Free", summary.freeSpaceGb, TileSeverity.NEUTRAL, suffix = "GB"))
                 add(TileMetric("Files", summary.numFiles.toInt(), TileSeverity.NEUTRAL))
                 summary.memoryUsedPercent?.let { used ->
@@ -236,6 +257,27 @@ class DashboardAggregator @Inject constructor(
             )
             TileStatus.Calendar(bucketCalendar(episodes, zone, today))
         }
+
+    /**
+     * Percentage of [capacityGb] in use given [freeGb], or null when no honest figure can be drawn.
+     *
+     * Rejected cases, all of which would otherwise render a confidently wrong bar:
+     *  - **unset or non-positive** capacity — nothing to divide by;
+     *  - **capacity below free space** — provably impossible, so the value is a typo or stale
+     *    rather than a disk somehow more empty than it is large;
+     *  - **negative free space** — defensive; a malformed response should not produce a bar.
+     *
+     * What this CANNOT catch is a capacity set too HIGH. With only free space to compare against,
+     * an inflated total is arithmetically indistinguishable from a genuinely full disk and renders
+     * as alarmingly near-full. That is inherent to deriving usage from free space alone, and is why
+     * the settings field spells out that the number has to be right.
+     */
+    internal fun usedPercentOrNull(freeGb: Int, capacityGb: Int): Int? {
+        if (capacityGb <= 0) return null
+        if (freeGb < 0) return null
+        if (freeGb > capacityGb) return null
+        return (((capacityGb - freeGb).toDouble() / capacityGb) * 100).toInt().coerceIn(0, 100)
+    }
 
     /**
      * Buckets episodes into [CALENDAR_DAYS_BEFORE]..[CALENDAR_DAYS_AFTER] around [today].
