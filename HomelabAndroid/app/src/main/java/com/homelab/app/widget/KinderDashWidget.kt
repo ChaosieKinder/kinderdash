@@ -30,6 +30,7 @@ import androidx.glance.unit.ColorProvider
 import com.homelab.app.data.local.DashboardSnapshotStore
 import com.homelab.app.data.repository.LocalPreferencesRepository
 import kotlinx.coroutines.flow.first
+import com.homelab.app.domain.model.CalendarDay
 import com.homelab.app.domain.model.DashboardState
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.TileMetric
@@ -113,7 +114,7 @@ class KinderDashWidget : GlanceAppWidget() {
             // LazyColumn, not Column: Glance's Column clips its overflow silently, so adding one
             // service too many would just make a tile vanish. This scrolls instead.
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                val rows = if (twoColumn) tiles.chunked(2) else tiles.map { listOf(it) }
+                val rows = buildRows(tiles, twoColumn)
                 rows.forEach { row ->
                     item {
                         Column {
@@ -122,8 +123,9 @@ class KinderDashWidget : GlanceAppWidget() {
                                     TileCard(tile, GlanceModifier.defaultWeight())
                                     if (index == 0 && row.size > 1) Spacer(GlanceModifier.size(8.dp))
                                 }
-                                // Keep a lone trailing tile at half width rather than stretched.
-                                if (twoColumn && row.size == 1) {
+                                // Pad a lone tile to half width so it doesn't stretch — except a
+                                // calendar, which is meant to own the full row.
+                                if (twoColumn && row.size == 1 && row[0].status !is TileStatus.Calendar) {
                                     Spacer(GlanceModifier.size(8.dp))
                                     Spacer(GlanceModifier.defaultWeight())
                                 }
@@ -183,6 +185,7 @@ class KinderDashWidget : GlanceAppWidget() {
 
             when (val status = tile.status) {
                 is TileStatus.Ready -> status.metrics.forEach { MetricRow(it) }
+                is TileStatus.Calendar -> CalendarWeek(status.days)
                 // Not an error — it just isn't set up. Say so quietly.
                 is TileStatus.NotConfigured -> Text(
                     text = "Not set up",
@@ -194,6 +197,56 @@ class KinderDashWidget : GlanceAppWidget() {
                     text = "Unavailable",
                     style = TextStyle(color = ColorProvider(Muted), fontSize = 13.sp())
                 )
+            }
+        }
+    }
+
+    /**
+     * Seven day columns: yesterday, today, and five ahead.
+     *
+     * Each column is "airing / downloaded" as a fraction rather than two numbers — at widget scale
+     * there is room for one glanceable figure per day, and "2/3" answers both questions at once.
+     * A day with nothing scheduled shows a dash, so empty days read as empty rather than as zero
+     * of something.
+     */
+    @androidx.compose.runtime.Composable
+    private fun CalendarWeek(days: List<CalendarDay>) {
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            days.forEach { day ->
+                Column(
+                    modifier = GlanceModifier.defaultWeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = day.label,
+                        maxLines = 1,
+                        style = TextStyle(
+                            // Today is the column the eye should land on first.
+                            color = ColorProvider(if (day.isToday) Foreground else Muted),
+                            fontSize = 10.sp(),
+                            fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal
+                        )
+                    )
+                    Spacer(GlanceModifier.size(2.dp))
+                    Text(
+                        text = if (day.total == 0) "–" else "${day.downloaded}/${day.total}",
+                        maxLines = 1,
+                        style = TextStyle(
+                            color = ColorProvider(
+                                when {
+                                    day.total == 0 -> Muted
+                                    // Everything that aired is on disk — nothing to do.
+                                    day.downloaded == day.total -> Good
+                                    // Something aired and has not landed. Warning, not danger:
+                                    // an episode airing tonight is not a fault.
+                                    else -> Warning
+                                }
+                            ),
+                            fontSize = 13.sp(),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
             }
         }
     }
@@ -254,6 +307,35 @@ private fun Int.sp() = androidx.compose.ui.unit.TextUnit(
     this.toFloat(),
     androidx.compose.ui.unit.TextUnitType.Sp
 )
+
+/**
+ * Groups tiles into rows, giving the calendar a row of its own.
+ *
+ * Seven day columns inside a half-width tile works out at roughly 17dp per column on a phone —
+ * unreadable. Everything else pairs up as normal.
+ */
+internal fun buildRows(tiles: List<DashboardTile>, twoColumn: Boolean): List<List<DashboardTile>> {
+    if (!twoColumn) return tiles.map { listOf(it) }
+
+    val rows = mutableListOf<List<DashboardTile>>()
+    var pending: DashboardTile? = null
+
+    tiles.forEach { tile ->
+        if (tile.status is TileStatus.Calendar) {
+            // Flush whatever was waiting for a partner; it takes half a row on its own.
+            pending?.let { rows.add(listOf(it)) }
+            pending = null
+            rows.add(listOf(tile))
+        } else if (pending == null) {
+            pending = tile
+        } else {
+            rows.add(listOf(pending!!, tile))
+            pending = null
+        }
+    }
+    pending?.let { rows.add(listOf(it)) }
+    return rows
+}
 
 /**
  * Which tiles are worth pixels.

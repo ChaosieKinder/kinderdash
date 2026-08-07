@@ -66,6 +66,7 @@ class DashboardAggregatorTest {
         coEvery { serviceInstances.getPreferredInstance(ServiceType.HOME_ASSISTANT) } returns instance(ServiceType.HOME_ASSISTANT)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.NEXTCLOUD) } returns instance(ServiceType.NEXTCLOUD)
         coEvery { serviceInstances.getPreferredInstance(ServiceType.TRANSMISSION) } returns instance(ServiceType.TRANSMISSION)
+        coEvery { serviceInstances.getPreferredInstance(ServiceType.SONARR) } returns instance(ServiceType.SONARR)
 
         coEvery { komodo.getDashboard(any()) } returns komodoDashboard(stopped = 0, unhealthy = 0)
         coEvery { uptimeKuma.getSummary(any()) } returns UptimeKumaSummary(upCount = 12, totalCount = 12)
@@ -75,6 +76,7 @@ class DashboardAggregatorTest {
         coEvery { homeAssistant.getSummary(any()) } returns HomeAssistantSummary(lightsOn = 2, unavailableEntities = 0, totalEntities = 300)
         coEvery { nextcloud.getSummary(any()) } returns NextcloudSummary(freeSpaceBytes = 500L * 1_073_741_824L, activeUsers24h = 1, numFiles = 90_000)
         coEvery { transmission.getSummary(any()) } returns TransmissionSummary(activeTorrents = 3, erroredTorrents = 0, totalTorrents = 10)
+        coEvery { mediaArr.getCalendar(any(), any(), any()) } returns emptyList()
     }
 
     private fun komodoDashboard(stopped: Int, unhealthy: Int): KomodoDashboardData {
@@ -100,7 +102,7 @@ class DashboardAggregatorTest {
 
         val state = aggregator().load(nowMillis = 1_000L)
 
-        assertEquals(8, state.tiles.size)
+        assertEquals(9, state.tiles.size)
         assertEquals(1_000L, state.generatedAtMillis)
         assertFalse(state.hasProblem)
         assertFalse(state.allUnavailable)
@@ -248,6 +250,7 @@ class DashboardAggregatorTest {
         coEvery { homeAssistant.getSummary(any()) } throws boom
         coEvery { nextcloud.getSummary(any()) } throws boom
         coEvery { transmission.getSummary(any()) } throws boom
+        coEvery { mediaArr.getCalendar(any(), any(), any()) } throws boom
 
         val state = aggregator().load(0L)
 

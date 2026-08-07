@@ -157,6 +157,15 @@ data class MediaArrCardPreview(
  * The cheap, typed slice of Seerr the widget needs — mirroring the `getSummary()` convention on
  * KomodoRepository, UptimeKumaRepository and PlexRepository. See [MediaArrRepository.getSeerrSummary].
  */
+/** One scheduled episode from an *arr calendar. */
+data class CalendarEpisode(
+    val airsAtMillis: Long,
+    /** True once the file is on disk. "Currently downloading" would need /api/v3/queue. */
+    val hasFile: Boolean,
+    val seriesTitle: String,
+    val episodeTitle: String
+)
+
 data class SeerrSummary(
     val pendingRequests: Int,
     val totalRequests: Int
@@ -376,6 +385,46 @@ class MediaArrRepository @Inject constructor(
      *
      * (Jellyseerr has since rebranded to Seerr; [ServiceType.JELLYSEERR] keeps the old name.)
      */
+    /**
+     * Episodes airing in a window, with whether the file is already on disk.
+     *
+     * `/api/v3/calendar` is already fetched by the card-preview path, which reduces it to a count
+     * and up to six bare titles — no dates, no hasFile. This reads the same response properly.
+     *
+     * Returns air times as epoch millis; bucketing into days is the caller's job because it has to
+     * happen in the DEVICE's timezone, not UTC. `airDateUtc` for a 9pm US broadcast is the next
+     * calendar day in UTC, so bucketing on the raw string would put episodes on the wrong row.
+     */
+    suspend fun getCalendar(
+        instanceId: String,
+        startDate: String,
+        endDate: String
+    ): List<CalendarEpisode> = withContext(Dispatchers.IO) {
+        val instance = serviceInstancesRepository.getInstance(instanceId)
+            ?: throw IllegalStateException("Service instance not found")
+
+        val rows = requestInstance(
+            instance,
+            "/api/v3/calendar?start=$startDate&end=$endDate&includeSeries=true"
+        ).asJsonArray ?: JSONArray()
+
+        buildList {
+            for (i in 0 until rows.length()) {
+                val row = rows.optJSONObject(i) ?: continue
+                val airs = row.optString("airDateUtc").takeIf { it.isNotBlank() } ?: continue
+                val millis = runCatching { java.time.Instant.parse(airs).toEpochMilli() }.getOrNull() ?: continue
+                add(
+                    CalendarEpisode(
+                        airsAtMillis = millis,
+                        hasFile = row.optBoolean("hasFile", false),
+                        seriesTitle = row.optJSONObject("series")?.optString("title").orEmpty(),
+                        episodeTitle = row.optString("title")
+                    )
+                )
+            }
+        }
+    }
+
     suspend fun getSeerrSummary(instanceId: String): SeerrSummary = withContext(Dispatchers.IO) {
         val instance = serviceInstancesRepository.getInstance(instanceId)
             ?: throw IllegalStateException("Service instance not found")

@@ -28,7 +28,7 @@ data class DashboardState(
 
     /** True if nothing could be reached at all — usually "off the network", not "everything died". */
     val allUnavailable: Boolean
-        get() = tiles.isNotEmpty() && tiles.none { it.status is TileStatus.Ready }
+        get() = tiles.isNotEmpty() && tiles.none { it.status is TileStatus.Loaded }
 }
 
 /** Stable identity for a tile, so the widget can order and lay out independently of labels. */
@@ -41,7 +41,8 @@ enum class DashboardTileKey {
     GRAFANA,
     HOME_ASSISTANT,
     NEXTCLOUD,
-    TRANSMISSION
+    TRANSMISSION,
+    CALENDAR
 }
 
 @Serializable
@@ -54,9 +55,20 @@ data class DashboardTile(
 
 @Serializable
 sealed interface TileStatus {
+    /** Reached the service successfully, whatever shape the result takes. */
+    sealed interface Loaded : TileStatus
+
     /** Fetched successfully. [metrics] may legitimately be empty. */
     @Serializable
-    data class Ready(val metrics: List<TileMetric>) : TileStatus
+    data class Ready(val metrics: List<TileMetric>) : Loaded
+
+    /**
+     * A week of scheduled episodes. Separate from [Ready] because a row of days is a different
+     * thing to render than a list of label/value pairs, and squeezing it into metrics would mean
+     * encoding dates into strings and parsing them back out in the widget.
+     */
+    @Serializable
+    data class Calendar(val days: List<CalendarDay>) : Loaded
 
     /** No instance of this service is set up — render nothing rather than an error. */
     @Serializable
@@ -70,6 +82,21 @@ sealed interface TileStatus {
     @Serializable
     data class Unavailable(val message: String?) : TileStatus
 }
+
+/**
+ * One day column in the calendar tile.
+ *
+ * Counts rather than episode lists: the widget shows a week at a glance, and the detail belongs on
+ * a screen if it is ever wanted.
+ */
+@Serializable
+data class CalendarDay(
+    /** Short label already resolved for display, e.g. "Mon" — or "Today"/"Yest". */
+    val label: String,
+    val total: Int,
+    val downloaded: Int,
+    val isToday: Boolean
+)
 
 @Serializable
 data class TileMetric(

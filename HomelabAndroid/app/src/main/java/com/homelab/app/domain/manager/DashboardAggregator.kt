@@ -9,6 +9,7 @@ import com.homelab.app.data.repository.MediaArrRepository
 import com.homelab.app.data.repository.PlexRepository
 import com.homelab.app.data.repository.ServiceInstancesRepository
 import com.homelab.app.data.repository.UptimeKumaRepository
+import com.homelab.app.domain.model.CalendarDay
 import com.homelab.app.domain.model.DashboardState
 import com.homelab.app.domain.model.DashboardTile
 import com.homelab.app.domain.model.DashboardTileKey
@@ -65,7 +66,8 @@ class DashboardAggregator @Inject constructor(
             async { grafanaTile() },
             async { homeAssistantTile() },
             async { nextcloudTile() },
-            async { transmissionTile() }
+            async { transmissionTile() },
+            async { calendarTile() }
         ).map { it.await() }
 
         DashboardState(tiles = tiles, generatedAtMillis = nowMillis)
@@ -180,6 +182,66 @@ class DashboardAggregator @Inject constructor(
         }
 
     /**
+     * A week of TV: yesterday, today, and the next five days.
+     *
+     * Yesterday is included on purpose — the common question on waking is "did last night's episode
+     * land?", which a today-onwards calendar cannot answer.
+     */
+    private suspend fun calendarTile(): DashboardTile =
+        loadedTile(DashboardTileKey.CALENDAR, ServiceType.SONARR) { instanceId ->
+            val zone = java.time.ZoneId.systemDefault()
+            val today = java.time.LocalDate.now(zone)
+            val format = java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+
+            // Over-fetch a day at each end. Sonarr's start/end are date-only and interpreted in UTC,
+            // so an episode sitting just inside a local-midnight boundary can fall outside a range
+            // that looks correct locally. Cheap insurance; bucketing discards the extras.
+            val episodes = mediaArr.getCalendar(
+                instanceId,
+                startDate = today.minusDays(CALENDAR_DAYS_BEFORE + 1L).format(format),
+                endDate = today.plusDays(CALENDAR_DAYS_AFTER + 1L).format(format)
+            )
+            TileStatus.Calendar(bucketCalendar(episodes, zone, today))
+        }
+
+    /**
+     * Buckets episodes into [CALENDAR_DAYS_BEFORE]..[CALENDAR_DAYS_AFTER] around [today].
+     *
+     * `today` is a parameter rather than read from the clock so this is deterministic and can be
+     * tested — the timezone handling below is the part most likely to be subtly wrong.
+     */
+    internal fun bucketCalendar(
+        episodes: List<com.homelab.app.data.repository.CalendarEpisode>,
+        zone: java.time.ZoneId,
+        today: java.time.LocalDate
+    ): List<CalendarDay> {
+        // Bucket by the LOCAL date of each air time. airDateUtc for a late-evening US broadcast is
+        // already the next day in UTC, so grouping on the raw timestamp's UTC date would shift half
+        // the week's episodes onto the wrong column.
+        val byDate = episodes.groupBy {
+            java.time.Instant.ofEpochMilli(it.airsAtMillis).atZone(zone).toLocalDate()
+        }
+
+        return (-CALENDAR_DAYS_BEFORE..CALENDAR_DAYS_AFTER).map { offset ->
+            val date = today.plusDays(offset.toLong())
+            val forDay = byDate[date].orEmpty()
+            CalendarDay(
+                label = when (offset) {
+                    0 -> "Today"
+                    -1 -> "Yest"
+                    else -> date.dayOfWeek.getDisplayName(
+                        java.time.format.TextStyle.SHORT,
+                        java.util.Locale.getDefault()
+                    )
+                },
+                total = forDay.size,
+                downloaded = forDay.count { it.hasFile },
+                isToday = offset == 0
+            )
+        }
+    }
+
+    /**
      * Resolves the preferred instance for [type], runs [fetch] against it under a timeout, and
      * converts any failure into a degraded tile rather than letting it escape.
      */
@@ -187,6 +249,18 @@ class DashboardAggregator @Inject constructor(
         key: DashboardTileKey,
         type: ServiceType,
         fetch: suspend (instanceId: String) -> List<TileMetric>
+    ): DashboardTile = loadedTile(key, type) { TileStatus.Ready(fetch(it)) }
+
+    /**
+     * As [tile], but for tiles whose result is not a list of metrics.
+     *
+     * All the resolution, timeout and failure-isolation behaviour lives here; [tile] is the common
+     * case expressed in terms of it.
+     */
+    private suspend fun loadedTile(
+        key: DashboardTileKey,
+        type: ServiceType,
+        fetch: suspend (instanceId: String) -> TileStatus.Loaded
     ): DashboardTile {
         val instance = try {
             serviceInstances.getPreferredInstance(type)
@@ -204,7 +278,7 @@ class DashboardAggregator @Inject constructor(
         val title = instance.label.ifBlank { type.displayName }
 
         return try {
-            DashboardTile(key, title, TileStatus.Ready(withTimeout(PER_TILE_TIMEOUT_MS) { fetch(instance.id) }))
+            DashboardTile(key, title, withTimeout(PER_TILE_TIMEOUT_MS) { fetch(instance.id) })
         } catch (error: TimeoutCancellationException) {
             // Caught BEFORE CancellationException on purpose — withTimeout signals by throwing a
             // subclass of it, so the usual "rethrow cancellation" rule would swallow our own timeout
@@ -227,5 +301,9 @@ class DashboardAggregator @Inject constructor(
          * quickly instead of stalling the refresh.
          */
         const val PER_TILE_TIMEOUT_MS = 8_000L
+
+        /** Yesterday plus today plus five ahead — seven columns. */
+        const val CALENDAR_DAYS_BEFORE = 1
+        const val CALENDAR_DAYS_AFTER = 5
     }
 }
